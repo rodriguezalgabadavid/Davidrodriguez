@@ -7,17 +7,18 @@
   --primary: #0f766e;
   --primary-strong: #115e59;
   --primary-soft: #ccfbf1;
+  --on-primary: #ffffff;
   --accent: #facc15;
   --danger: #dc2626;
   --work: #0f766e;
   --rest: #1e3a8a;
   --radius: 16px;
   --shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 4px 12px rgb(15 23 42 / 0.05);
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #0b1514;
     --surface: #13201f;
     --text: #e2e8f0;
@@ -26,8 +27,24 @@
     --primary: #2dd4bf;
     --primary-strong: #5eead4;
     --primary-soft: #134e4a;
+    --on-primary: #042f2e;
     --shadow: none;
+    color-scheme: dark;
   }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0b1514;
+  --surface: #13201f;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --border: #1f3331;
+  --primary: #2dd4bf;
+  --primary-strong: #5eead4;
+  --primary-soft: #134e4a;
+  --on-primary: #042f2e;
+  --shadow: none;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -124,14 +141,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   font-weight: 600;
 }
 
-.btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .btn.primary:active { background: var(--primary-strong); }
 .btn.danger { color: var(--danger); border-color: currentColor; background: none; margin-top: 1rem; }
 .btn.big { width: 100%; padding: 0.95rem; font-size: 1.05rem; }
-
-@media (prefers-color-scheme: dark) {
-  .btn.primary { color: #042f2e; }
-}
 
 /* Inicio */
 
@@ -346,3 +359,19 @@ input[type='range'] { width: 100%; accent-color: var(--primary); }
 @media (min-width: 560px) {
   .focus-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* Diálogo de confirmación */
+
+.confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(15 23 42 / 0.55);
+}
+.confirm-box { width: min(100%, 360px); color: var(--text); }
+.confirm-box p { margin-bottom: 1rem; }
+.confirm-box .actions { margin-top: 0; }
+.btn.danger.solid { background: var(--danger); border-color: var(--danger); color: #fff; margin-top: 0; }

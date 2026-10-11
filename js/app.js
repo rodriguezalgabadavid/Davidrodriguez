@@ -83,6 +83,28 @@ function exerciseCard(ex, { compact = false } = {}) {
     </details>`;
 }
 
+// Confirmación dentro de la página (confirm() nativo no está disponible en todos los visores).
+function askConfirm(message, confirmLabel, onConfirm) {
+  const dialog = document.createElement('div');
+  dialog.className = 'confirm';
+  dialog.innerHTML = `
+    <div class="confirm-box card" role="alertdialog" aria-modal="true">
+      <p>${escapeHtml(message)}</p>
+      <div class="actions">
+        <button class="btn" data-confirm="no">Cancelar</button>
+        <button class="btn danger solid" data-confirm="yes">${escapeHtml(confirmLabel)}</button>
+      </div>
+    </div>`;
+  dialog.addEventListener('click', (event) => {
+    const choice = event.target.closest('[data-confirm]')?.dataset.confirm;
+    if (!choice && event.target !== dialog) return;
+    dialog.remove();
+    if (choice === 'yes') onConfirm();
+  });
+  document.body.append(dialog);
+  dialog.querySelector('[data-confirm="no"]').focus();
+}
+
 // ---------- Vistas ----------
 
 function viewInicio() {
@@ -350,12 +372,11 @@ document.addEventListener('click', (event) => {
       state.library.category = el.dataset.value;
       return render();
     case 'clear-history':
-      if (confirm('¿Seguro que quieres borrar todo el historial?')) {
+      return askConfirm('¿Seguro que quieres borrar todo el historial?', 'Borrar', () => {
         state.history = [];
         saveHistory();
         render();
-      }
-      return;
+      });
   }
 });
 
@@ -595,8 +616,7 @@ $player.addEventListener('click', (event) => {
     case 'prev':
       return goToStep(Math.max(0, player.index - 1));
     case 'close':
-      if (confirm('¿Salir de la sesión? No se guardará el progreso.')) closePlayer();
-      return;
+      return askConfirm('¿Salir de la sesión? No se guardará el progreso.', 'Salir', closePlayer);
     case 'save':
       state.history.push({
         date: new Date().toISOString(),
