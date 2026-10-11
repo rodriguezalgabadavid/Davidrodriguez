@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f766e" />
-  <meta name="description" content="Preparación física específica para jugadores de pádel: sesiones a medida, temporizador y seguimiento." />
+  <meta name="description" content="Registra tus partidos de pádel, sigue tus estadísticas y entrena tu preparación física." />
   <title>PadelFit</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
@@ -22,10 +22,11 @@
   <main id="view" class="view" aria-live="polite"></main>
 
   <nav class="tabbar" aria-label="Secciones">
-    <button data-route="inicio" aria-label="Inicio"><span class="ico">🏠</span><span>Inicio</span></button>
-    <button data-route="entrenar" aria-label="Entrenar"><span class="ico">⚡</span><span>Entrenar</span></button>
-    <button data-route="ejercicios" aria-label="Ejercicios"><span class="ico">📚</span><span>Ejercicios</span></button>
-    <button data-route="progreso" aria-label="Progreso"><span class="ico">📈</span><span>Progreso</span></button>
+    <button data-route="inicio"><span class="ico" aria-hidden="true">🏠</span><span>Muro</span></button>
+    <button data-route="entrenar"><span class="ico" aria-hidden="true">⚡</span><span>Entrenar</span></button>
+    <button data-route="registrar" class="tab-add" aria-label="Registrar actividad"><span class="plus" aria-hidden="true">＋</span></button>
+    <button data-route="progreso"><span class="ico" aria-hidden="true">📈</span><span>Progreso</span></button>
+    <button data-route="ejercicios"><span class="ico" aria-hidden="true">📚</span><span>Ejercicios</span></button>
   </nav>
 
   <section id="player" class="player" hidden aria-modal="true" role="dialog" aria-label="Entrenamiento en curso"></section>

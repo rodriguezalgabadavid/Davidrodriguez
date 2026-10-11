@@ -1,7 +1,7 @@
 {
-  "name": "PadelFit · Preparación física de pádel",
+  "name": "PadelFit · Tu pádel y tu físico",
   "short_name": "PadelFit",
-  "description": "Sesiones de preparación física específicas para pádel, con temporizador y seguimiento.",
+  "description": "Registra tus partidos de pádel, sigue tus estadísticas y entrena tu preparación física.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",

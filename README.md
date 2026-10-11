@@ -1,16 +1,33 @@
 # PadelFit 🎾
 
-App web (PWA) de **preparación física específica para pádel**. Genera sesiones a tu medida, te guía con un temporizador de intervalos y registra tu progreso. Sin dependencias ni servidor: todo se guarda en tu dispositivo y funciona sin conexión.
+Tu pádel en un solo sitio, al estilo Strava: **registra tus partidos, sigue tus estadísticas y entrena la preparación física específica para pádel**. Es una app web (PWA) sin dependencias: se instala en el móvil, funciona sin conexión y tus datos se guardan en tu dispositivo.
 
 ## Funcionalidades
 
-- **Generador de sesiones**: elige objetivo, nivel, duración (15–60 min) y el material que tienes. Cada sesión incluye calentamiento, bloque principal por rondas y vuelta a la calma.
-  - Objetivos: sesión completa, agilidad en pista, potencia y salto, core y golpeo, prevención de lesiones y resistencia de partido.
-  - Niveles: iniciación (30s/30s), intermedio (40s/20s) y avanzado (45s/15s).
-- **Temporizador guiado**: pantalla completa con cuenta atrás, avisos sonoros y vibración, aviso de "cambia de lado" en ejercicios unilaterales, siguiente ejercicio y pantalla siempre encendida (Wake Lock).
-- **Biblioteca de +50 ejercicios** con explicación técnica y por qué te sirve en pista, filtrables por categoría y buscables.
-- **Progreso**: racha de días, objetivo semanal, minutos por día de la semana e historial con esfuerzo percibido (RPE 1–10).
-- **Instalable y offline**: añádela a la pantalla de inicio del móvil.
+### Muro de actividad
+- Partidos, clases técnicas y sesiones de físico en un mismo muro, con resultado, tiempo, esfuerzo y carga.
+- Resumen semanal: actividades, horas, carga, partidos ganados/perdidos, comparación con la semana anterior y objetivo semanal.
+- Gráfico de minutos por día y tipo de actividad.
+
+### Registro de partidos
+- Marcador por sets (incluye súper tie-break), tipo (amistoso, liga, torneo, americana), posición (drive/revés), compañero, rivales y club, con autocompletado de nombres ya usados.
+- Esfuerzo percibido (escala de Borg CR-10) y sensaciones.
+- Editar y eliminar actividades.
+
+### Estadísticas
+- Porcentaje de victorias, racha actual y mejor racha, últimos 5 resultados, sets y juegos a favor/en contra, balance por posición.
+- Balance con cada compañero y contra cada rival.
+- **Carga de entrenamiento** (minutos × esfuerzo, método sRPE) de las últimas 8 semanas y ratio carga aguda/crónica con aviso de sobrecarga.
+- Logros: remontada, rosco, rachas, torneos, sesiones de físico…
+
+### Preparación física
+- Generador de sesiones por objetivo (agilidad, potencia, core, prevención, resistencia…), nivel, duración y material disponible.
+- Temporizador guiado a pantalla completa con avisos sonoros, vibración y "cambia de lado".
+- Biblioteca de más de 50 ejercicios explicados con su aplicación en pista.
+
+### Tus datos
+- Copia de seguridad descargable y restaurable (JSON), para no perder el historial o pasarlo a otro móvil.
+- Datos de ejemplo para probar la app vacía.
 
 ## Uso
 
@@ -19,21 +36,26 @@ npm start        # sirve la app en http://localhost:8080
 npm test         # tests unitarios (node:test, sin dependencias)
 ```
 
-Cualquier servidor estático vale (GitHub Pages, Netlify…). Los módulos ES y el service worker no funcionan abriendo el `index.html` directamente con `file://`.
+Abrir `index.html` directamente con `file://` no funciona (módulos ES y service worker necesitan un servidor).
+
+### Publicación en GitHub Pages
+El workflow `.github/workflows/pages.yml` ejecuta los tests y publica la app en cada push a la rama principal. Para activarlo una única vez: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 
 ## Estructura
 
 ```
 index.html            Shell de la app
 css/styles.css        Estilos (modo claro/oscuro, mobile first)
+js/app.js             Estado, persistencia (localStorage), navegación y eventos
+js/views.js           Vistas: muro, registro, detalle, progreso, entrenar, ejercicios
+js/activities.js      Modelo de actividades y partidos (marcador, carga, normalización)
+js/stats.js           Estadísticas, carga semanal, ratio agudo/crónico y logros
+js/generator.js       Generador de sesiones físicas y línea de tiempo del temporizador
+js/player.js          Temporizador de intervalos a pantalla completa
 js/data.js            Ejercicios, categorías, niveles y objetivos
-js/generator.js       Generación de sesiones y línea de tiempo del temporizador
-js/stats.js           Racha, resumen semanal y estadísticas
-js/app.js             Vistas, navegación, reproductor y persistencia (localStorage)
+js/ui.js              Utilidades de interfaz (formato, diálogos, avisos)
 sw.js                 Service worker para uso sin conexión
-tests/                Tests de generador y estadísticas
+tests/                Tests de lógica
 ```
-
-Para añadir ejercicios basta con ampliar `EXERCISES` en `js/data.js`; el generador los incorpora automáticamente según su categoría, nivel y material.
 
 > Esta app no sustituye el consejo de un preparador físico o fisioterapeuta. Si tienes una lesión, consulta antes de entrenar.

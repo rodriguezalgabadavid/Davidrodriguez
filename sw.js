@@ -1,5 +1,5 @@
 // Service worker: guarda la app en caché para poder entrenar sin conexión (p. ej. en el club).
-const CACHE = 'padelfit-v1';
+const CACHE = 'padelfit-v2';
 const ASSETS = [
   './',
   'index.html',
@@ -9,6 +9,10 @@ const ASSETS = [
   'js/data.js',
   'js/generator.js',
   'js/stats.js',
+  'js/activities.js',
+  'js/player.js',
+  'js/ui.js',
+  'js/views.js',
   'icons/icon.svg',
 ];
 
