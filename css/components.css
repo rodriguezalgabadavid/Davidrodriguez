@@ -1,0 +1,211 @@
+/* Componentes sociales compartidos: tarjeta de actividad (al estilo Strava), pista con marcador,
+   hoja de "¡Vamos!", botón de seguir y etiqueta de ejemplo. Solo tokens de styles.css. */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Tarjeta de actividad ---------- */
+
+.act-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.act-linked { cursor: pointer; }
+.act-linked:hover { border-color: var(--border-strong); }
+
+.act-head { display: flex; align-items: center; gap: 0.75rem; }
+.act-avatar { display: inline-flex; border-radius: 50%; }
+.act-who { display: flex; flex-direction: column; min-width: 0; }
+.act-name-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0.1rem 0.35rem; }
+.act-name { color: var(--text); font-weight: 700; text-decoration: none; }
+.act-name:hover { text-decoration: underline; text-underline-offset: 3px; }
+.act-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.35rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.act-type { display: inline-flex; color: var(--type); }
+.act-club { overflow-wrap: anywhere; }
+
+.act-demo {
+  padding: 0 0.4rem;
+  border: 1px dashed var(--warn);
+  border-radius: 5px;
+  color: var(--warn);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.act-title { margin: 0; font-size: 1.4rem; line-height: 1.2; }
+.act-title-link { color: var(--text); text-decoration: none; }
+.act-title-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+.act-text { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.act-text-clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+.act-stats { padding: 0.15rem 0; }
+
+.act-people { display: flex; align-items: flex-start; gap: 0.45rem; margin: 0; color: var(--muted); font-size: 0.95rem; }
+.act-people .icon { margin-top: 0.15rem; }
+.act-people strong { color: var(--text); font-weight: 600; }
+
+/* Foto y pista ocupan todo el ancho de la tarjeta, como el mapa en Strava */
+.act-photo,
+.act-card > .court { margin: 0.25rem -1rem 0; }
+.act-photo img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--surface-2); }
+
+/* ---------- La pista con el marcador ---------- */
+
+.court {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 2 / 1;
+  max-height: 15rem;
+  width: auto;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgb(255 255 255 / 0.12), transparent 60%),
+    linear-gradient(180deg, var(--court), var(--court-deep));
+}
+.court-lines {
+  position: absolute;
+  inset: 8% 6%;
+  width: 88%;
+  height: 84%;
+  fill: none;
+  stroke: var(--court-line);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+.court-lines .court-net { stroke-width: 3; stroke-dasharray: 2 3; }
+
+.court-board {
+  position: relative;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  background: rgb(10 18 38 / 0.82);
+  color: #fff;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+  font-variant-numeric: tabular-nums;
+}
+.court-row { display: flex; align-items: center; gap: 0.5rem; }
+.court-team { min-width: 5.5rem; font-size: 0.85rem; font-weight: 500; color: rgb(255 255 255 / 0.78); }
+.court-row-win .court-team { color: #fff; font-weight: 700; }
+.court-row-win .court-team::after {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-left: 0.4rem;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+.court-set {
+  min-width: 1.6rem;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: rgb(255 255 255 / 0.7);
+}
+.court-set-won { color: #fff; font-weight: 700; }
+
+/* ---------- Resumen social y acciones ---------- */
+
+.act-social { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; min-height: 0; }
+.act-social:has(> :not([hidden])) { padding-top: 0.1rem; }
+.act-social-link {
+  padding: 0.2rem 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.act-social-link:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+
+.act-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 0 -1rem;
+  border-top: 1px solid var(--border);
+}
+.act-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 3rem;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-weight: 600;
+}
+.act-action + .act-action { border-left: 1px solid var(--border); }
+.act-action:hover { background: var(--surface-2); }
+.act-action .kudos-count { display: none; }
+
+/* ¡Vamos! dado: la pala se rellena con el amarillo de la bola */
+.kudos-on { color: var(--primary-strong); }
+.kudos-on .icon-racket path:first-child { fill: var(--accent); stroke: var(--text); }
+.kudos-on span { color: var(--primary-strong); }
+.kudos-pop .icon { animation: kudos-pop 0.35s ease; }
+@keyframes kudos-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.3) rotate(-12deg); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- Hoja "¡Vamos!" ---------- */
+
+.kudos-sheet h2 { display: flex; align-items: center; gap: 0.5rem; }
+.kudos-list { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.kudos-person {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.4rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  text-align: left;
+}
+.kudos-person-name { font-weight: 600; }
+
+/* ---------- Seguir ---------- */
+
+.card-follow { min-height: 2.5rem; padding: 0.4rem 1rem; flex-shrink: 0; }
+.card-follow[aria-pressed='true'] { color: var(--muted); }
+
+@media (min-width: 720px) {
+  .act-card { padding: 1.25rem 1.25rem 0; }
+  .act-photo,
+  .act-card > .court,
+  .act-actions { margin-left: -1.25rem; margin-right: -1.25rem; }
+}

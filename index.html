@@ -3,13 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f766e" />
+  <meta name="theme-color" content="#1d56cf" />
   <meta name="description" content="La red social del pádel: comparte tus partidos, completa retos y entrena tu físico." />
   <title>PadelFit</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icons/icon.svg" />
+  <link rel="preload" href="fonts/barlow-400.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="fonts/barlow-semi-condensed-700.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="css/fonts.css" />
   <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/social.css" />
   <link rel="stylesheet" href="css/publish.css" />
   <link rel="stylesheet" href="css/train.css" />
@@ -17,14 +21,18 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#inicio">
-      <img src="icons/icon.svg" alt="" width="28" height="28" />
+    <a class="brand" id="topbar-brand" href="#inicio" data-route="inicio">
+      <img src="icons/icon.svg" alt="" width="30" height="30" />
       <span>PadelFit</span>
     </a>
+    <div class="topbar-start" id="topbar-start" hidden>
+      <button class="icon-plain topbar-back" id="topbar-back" aria-label="Volver"><svg class="icon icon-back" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 18.5 8.5 12 15 5.5"/></svg></button>
+      <h1 class="topbar-title" id="topbar-title"></h1>
+    </div>
     <div class="topbar-actions">
-      <button class="icon-plain" data-route="buscar" aria-label="Buscar jugadores">🔍</button>
+      <button class="icon-plain" data-route="buscar" aria-label="Buscar jugadores"><svg class="icon icon-search" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></button>
       <button class="icon-plain bell" data-route="notificaciones" aria-label="Notificaciones">
-        🔔<span id="notif-count" class="notif-count" hidden>0</span>
+        <svg class="icon icon-bell" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z"/><path d="M10 21h4"/></svg><span id="notif-count" class="notif-count" hidden>0</span>
       </button>
     </div>
   </header>
@@ -33,11 +41,11 @@
   <main id="view" class="view" aria-live="polite"></main>
 
   <nav class="tabbar" aria-label="Secciones">
-    <button data-route="inicio"><span class="ico" aria-hidden="true">🏠</span><span>Inicio</span></button>
-    <button data-route="retos"><span class="ico" aria-hidden="true">🏆</span><span>Retos</span></button>
-    <button data-route="publicar" class="tab-add" aria-label="Publicar actividad"><span class="plus" aria-hidden="true">＋</span></button>
-    <button data-route="entrenar"><span class="ico" aria-hidden="true">💪</span><span>Entrenar</span></button>
-    <button data-route="perfil"><span class="ico" aria-hidden="true">👤</span><span>Perfil</span></button>
+    <button data-route="inicio"><span class="ico"><svg class="icon icon-home" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v11h5v-6h3v6h5V9"/></svg></span><span>Inicio</span></button>
+    <button data-route="retos"><span class="ico"><svg class="icon icon-trophy" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 4h8v5a4 4 0 0 1-8 0V4Z"/><path d="M8 6H4.5v1a3.5 3.5 0 0 0 3.6 3.5"/><path d="M16 6h3.5v1a3.5 3.5 0 0 1-3.6 3.5"/><path d="M12 13v4"/><path d="M8.5 20.5h7"/><path d="M10 17h4l.5 3.5h-5L10 17Z"/></svg></span><span>Retos</span></button>
+    <button data-route="publicar" class="tab-add" aria-label="Publicar actividad"><span class="plus"><svg class="icon icon-plus" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14"/><path d="M5 12h14"/></svg></span></button>
+    <button data-route="entrenar"><span class="ico"><svg class="icon icon-dumbbell" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6.5 7v10"/><path d="M3.5 9.5v5"/><path d="M17.5 7v10"/><path d="M20.5 9.5v5"/><path d="M6.5 12h11"/></svg></span><span>Entrenar</span></button>
+    <button data-route="perfil"><span class="ico"><svg class="icon icon-user" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></span><span>Tú</span></button>
   </nav>
 
   <section id="player" class="player" hidden aria-modal="true" role="dialog" aria-label="Entrenamiento en curso"></section>

@@ -1,6 +1,7 @@
 import { ACTIVITY_TYPES, activityTitle, formatScore, matchOutcome } from './activities.js';
 import { getPlan } from './plans.js';
-import { avatar, escapeHtml, formatDuration, formatWhen, premiumBadge, sheet, timeAgo, toast } from './ui.js';
+import { icon, TYPE_ICONS } from './icons.js';
+import { avatar, escapeHtml, formatDuration, premiumBadge, sheet, toast } from './ui.js';
 
 // Componentes sociales compartidos: tarjeta de actividad, botón de seguir y acciones globales
 // ("¡Vamos!", abrir actividad, seguir/dejar de seguir, ver quién ha dado "¡Vamos!").
@@ -28,62 +29,92 @@ export const demoTag = (profile) => (profile?.demo ? '<span class="act-demo" tit
 
 const profileLink = (id) => `href="#perfil" data-route="perfil" data-param-id="${attr(id)}"`;
 
-// ---------- Tarjeta de actividad ----------
+// ---------- Tarjeta de actividad (al estilo Strava) ----------
+// Cabecera con autor, fecha y club · título grande · texto · fila de estadísticas · foto o la pista con el
+// marcador (nuestro "mapa") · resumen de ¡Vamos! y comentarios · botones ¡Vamos! y Comentar.
 
-function resultPill(won, hasSets) {
-  if (won === true) return '<span class="result win">Victoria</span>';
-  if (won === false) return '<span class="result loss">Derrota</span>';
-  return hasSets ? '<span class="result draw">Empate</span>' : '';
+const timeFmt = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
+const dayFmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' });
+
+// "Hoy a las 19:30", "Ayer a las 19:30", "6 oct. · 19:30"
+function whenLabel(date, now) {
+  const d = new Date(date);
+  const days = Math.round((new Date(now).setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 864e5);
+  if (days === 0) return `Hoy a las ${timeFmt.format(d)}`;
+  if (days === 1) return `Ayer a las ${timeFmt.format(d)}`;
+  return `${dayFmt.format(d)} · ${timeFmt.format(d)}`;
 }
 
-// Marcador completo (solo en el detalle).
-function scoreboard(sets) {
+const VERDICT = { true: 'Victoria', false: 'Derrota' };
+
+function statsFor(a) {
+  const items = [];
+  if (a.type === 'partido') {
+    const won = wonOf(a);
+    items.push(['Resultado', won === null ? (a.sets?.length ? 'Empate' : '—') : VERDICT[won]]);
+  }
+  if (a.seconds > 0) items.push([a.type === 'partido' ? 'Tiempo' : 'Duración', formatDuration(a.seconds)]);
+  if (a.rpe) items.push(['Esfuerzo', `${a.rpe}<small>/10</small>`, true]);
+  if (a.type === 'entreno' && a.plan?.planId) {
+    const name = getPlan(a.plan.planId)?.name ?? (a.plan.planId === 'premium' ? 'Personalizado' : 'Plan');
+    items.push(['Plan', escapeHtml(name), true]);
+  }
+  if (!items.length) return '';
+  return `
+    <dl class="stats-row act-stats">
+      ${items.map(([k, v, raw]) => `<div><dt class="stat-label">${k}</dt><dd class="stat-value">${raw ? v : escapeHtml(v)}</dd></div>`).join('')}
+    </dl>`;
+}
+
+function peopleLine(a) {
+  if (a.type !== 'partido') return '';
+  const parts = [];
+  if (a.partner) parts.push(`Con <strong>${escapeHtml(a.partner)}</strong>`);
+  if (a.rivals?.length) parts.push(`contra ${a.rivals.map((r) => `<strong>${escapeHtml(r)}</strong>`).join(' y ')}`);
+  return parts.length ? `<p class="act-people">${icon('users', { size: 18 })}<span>${parts.join(' · ')}</span></p>` : '';
+}
+
+// La pista vista desde arriba con el marcador encima: lo que en Strava sería el mapa del recorrido.
+function courtScore(a) {
+  const sets = a.sets ?? [];
   const { won } = matchOutcome(sets);
   const row = (label, side, isWinner) => `
-    <tr class="${isWinner ? 'winner' : ''}">
-      <th scope="row">${label}</th>
-      ${sets.map(([a, b]) => {
-        const mine = side === 0 ? a : b;
-        const theirs = side === 0 ? b : a;
-        return `<td class="${mine > theirs ? 'set-won' : ''}">${escapeHtml(mine)}</td>`;
+    <div class="court-row${isWinner ? ' court-row-win' : ''}">
+      <span class="court-team">${label}</span>
+      ${sets.map(([x, y]) => {
+        const mine = side === 0 ? x : y;
+        const theirs = side === 0 ? y : x;
+        return `<span class="court-set${mine > theirs ? ' court-set-won' : ''}">${escapeHtml(mine)}</span>`;
       }).join('')}
-    </tr>`;
+    </div>`;
+  const verdict = won === null ? 'Empate' : VERDICT[won];
   return `
-    <table class="scoreboard act-scoreboard" aria-label="Resultado ${escapeHtml(formatScore(sets))}">
-      <tbody>${row('Nosotros', 0, won === true)}${row('Rivales', 1, won === false)}</tbody>
-    </table>`;
+    <div class="court" role="img" aria-label="${attr(`${verdict}: ${formatScore(sets)}`)}">
+      <svg class="court-lines" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <rect x="6" y="6" width="188" height="88" rx="2"/>
+        <path d="M37 6v88M163 6v88M37 50h126"/>
+        <path class="court-net" d="M100 2v96"/>
+      </svg>
+      <div class="court-board" aria-hidden="true">
+        ${row('Nosotros', 0, won === true)}
+        ${row('Rivales', 1, won === false)}
+      </div>
+    </div>`;
 }
 
-function matchBlock(a, { full }) {
-  if (a.type !== 'partido') return '';
-  const sets = a.sets ?? [];
-  const pill = resultPill(wonOf(a), sets.length > 0);
-  const score = sets.length
-    ? (full ? scoreboard(sets) : `<span class="act-score">${escapeHtml(formatScore(sets))}</span>`)
-    : '';
-  const people = [];
-  if (a.partner) people.push(`con <strong>${escapeHtml(a.partner)}</strong>`);
-  if (a.rivals?.length) people.push(`vs ${a.rivals.map((r) => `<strong>${escapeHtml(r)}</strong>`).join(' y ')}`);
-  return `
-    ${pill || score ? `<div class="act-match">${pill}${score}</div>` : ''}
-    ${people.length ? `<p class="act-people">${people.join(' ')}</p>` : ''}`;
-}
-
-function planLine(a) {
-  if (!a.plan?.planId) return '';
-  const name = getPlan(a.plan.planId)?.name ?? (a.plan.planId === 'premium' ? 'Plan personalizado' : 'Plan de físico');
-  return `<p class="act-plan">📋 ${escapeHtml(name)}</p>`;
-}
-
-function statsRow(a) {
-  const items = [];
-  if (a.seconds > 0) items.push(['Duración', formatDuration(a.seconds)]);
-  if (a.rpe) items.push(['Esfuerzo', `${a.rpe}/10`]);
-  if (!items.length) return '';
-  return `<dl class="act-stats">${items.map(([k, v]) => `<div><dt>${k}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')}</dl>`;
+function media(a, author, title, link) {
+  if (a.photoUrl) {
+    return `
+      <figure class="act-photo">
+        <img src="${attr(a.photoUrl)}" alt="${attr(`Foto de ${author.name}: ${title}`)}" loading="${link ? 'lazy' : 'eager'}" decoding="async" />
+      </figure>`;
+  }
+  if (a.type === 'partido' && a.sets?.length) return courtScore(a);
+  return '';
 }
 
 const kudosWhoLabel = (n) => `${n} ¡Vamos!`;
+const commentsLabel = (n) => `${n} comentario${n === 1 ? '' : 's'}`;
 
 function footer(a) {
   const id = attr(a.id);
@@ -91,20 +122,23 @@ function footer(a) {
   const comments = Number(a.commentsCount) || 0;
   // En tus propias actividades no te das "¡Vamos!" a ti mismo: el botón muestra quién te lo ha dado.
   const kudosButton = a.isMine
-    ? `<button class="kudos-btn kudos-own" data-action="show-kudoers" data-id="${id}" aria-label="Ver quién te ha dado ¡Vamos! (${kudos})">
-        <span class="kudos-icon" aria-hidden="true">🙌</span><span class="kudos-label">¡Vamos!</span><span class="kudos-count">${kudos}</span>
+    ? `<button class="act-action" data-action="show-kudoers" data-id="${id}">
+        ${icon('racket')}<span>¡Vamos!</span><span class="kudos-count" hidden>${kudos}</span>
       </button>`
-    : `<button class="kudos-btn${a.kudoedByMe ? ' kudos-on' : ''}" data-action="kudos" data-id="${id}" data-kudos-btn="${id}"
+    : `<button class="act-action kudos-btn${a.kudoedByMe ? ' kudos-on' : ''}" data-action="kudos" data-id="${id}" data-kudos-btn="${id}"
         data-count="${kudos}" aria-pressed="${a.kudoedByMe ? 'true' : 'false'}">
-        <span class="kudos-icon" aria-hidden="true">🙌</span><span class="kudos-label">¡Vamos!</span><span class="kudos-count"${kudos ? '' : ' hidden'}>${kudos}</span>
+        ${icon('racket')}<span>¡Vamos!</span><span class="kudos-count" hidden>${kudos}</span>
       </button>`;
   return `
-    <footer class="act-foot">
-      ${kudosButton}
-      <button class="act-cm-btn" data-action="open-activity" data-id="${id}" data-focus="comment" aria-label="Comentar (${comments})">
-        <span aria-hidden="true">💬</span><span class="act-cm-count" data-cm-for="${id}"${comments ? '' : ' hidden'}>${comments}</span>
+    <div class="act-social">
+      <button class="act-social-link kudos-who" data-action="show-kudoers" data-id="${id}" data-kudos-who="${id}"${kudos ? '' : ' hidden'}>${kudosWhoLabel(kudos)}</button>
+      <button class="act-social-link act-cm-btn" data-action="open-activity" data-id="${id}" data-focus="comment">
+        <span data-cm-for="${id}" data-cm-label="long"${comments ? '' : ' hidden'}>${commentsLabel(comments)}</span>
       </button>
-      ${a.isMine ? '' : `<button class="kudos-who" data-action="show-kudoers" data-id="${id}" data-kudos-who="${id}"${kudos ? '' : ' hidden'}>${kudosWhoLabel(kudos)}</button>`}
+    </div>
+    <footer class="act-actions">
+      ${kudosButton}
+      <button class="act-action" data-action="open-activity" data-id="${id}" data-focus="comment">${icon('comment')}<span>Comentar</span></button>
     </footer>`;
 }
 
@@ -117,32 +151,28 @@ export function activityCard(activity, ctx, { link = true } = {}) {
   const author = a.author ?? { id: a.userId, name: 'Jugador', avatarUrl: null, isPremium: false };
   const title = activityTitle(a);
   const now = ctx?.now ?? new Date();
-  const fullDate = formatWhen(a.date, now);
-  const when = link ? timeAgo(a.date, now) : fullDate;
-  const TitleTag = link ? 'h2' : 'h1';
   const titleHtml = link
     ? `<a class="act-title-link" href="#actividad" data-route="actividad" data-param-id="${id}">${escapeHtml(title)}</a>`
     : escapeHtml(title);
 
   return `
-    <article class="card act-card${link ? ' act-linked' : ''}" ${link ? `data-action="open-activity" data-id="${id}"` : ''} style="--type:var(--t-${type})">
+    <article class="act-card${link ? ' act-linked' : ''}" ${link ? `data-action="open-activity" data-id="${id}"` : ''} style="--type:var(--t-${type})">
       <header class="act-head">
         <a class="act-avatar" ${profileLink(author.id)} tabindex="-1" aria-hidden="true">${avatar(author)}</a>
         <div class="act-who">
           <span class="act-name-line"><a class="act-name" ${profileLink(author.id)}>${escapeHtml(author.name)}</a>${premiumBadge(author)}${demoTag(author)}</span>
-          <span class="act-meta"><time datetime="${attr(a.date)}" title="${attr(fullDate)}">${escapeHtml(when)}</time>${a.club ? ` · ${escapeHtml(a.club)}` : ''}</span>
+          <span class="act-meta">
+            <span class="act-type" title="${attr(ACTIVITY_TYPES[type].label)}">${icon(TYPE_ICONS[type], { size: 16 })}<span class="sr-only">${escapeHtml(ACTIVITY_TYPES[type].label)}.</span></span>
+            <time datetime="${attr(a.date)}">${escapeHtml(whenLabel(a.date, now))}</time>${a.club ? `<span class="act-club">· ${escapeHtml(a.club)}</span>` : ''}
+          </span>
         </div>
-        <span class="act-type" title="${attr(ACTIVITY_TYPES[type].label)}" aria-hidden="true">${ACTIVITY_TYPES[type].icon}</span>
       </header>
-      <${TitleTag} class="act-title">${titleHtml}</${TitleTag}>
-      ${matchBlock(a, { full: !link })}
-      ${planLine(a)}
+      <h2 class="act-title">${titleHtml}</h2>
       ${a.text ? `<p class="act-text${link ? ' act-text-clamp' : ''}">${escapeHtml(a.text)}</p>` : ''}
-      ${statsRow(a)}
-      ${a.photoUrl ? `
-        <figure class="act-photo">
-          <img src="${attr(a.photoUrl)}" alt="${attr(`Foto de ${author.name}: ${title}`)}" loading="${link ? 'lazy' : 'eager'}" decoding="async" />
-        </figure>` : ''}
+      ${statsFor(a)}
+      ${peopleLine(a)}
+      ${!link && a.type === 'partido' && a.sets?.length && a.photoUrl ? courtScore(a) : ''}
+      ${media(a, author, title, link)}
       ${footer(a)}
     </article>`;
 }
@@ -176,9 +206,8 @@ function applyKudos(id, { kudoedByMe, kudosCount }, { pop = false } = {}) {
 export function updateCommentCount(activityId, count) {
   const n = Math.max(0, Number(count) || 0);
   for (const el of marked('data-cm-for', activityId)) {
-    el.textContent = String(n);
+    el.textContent = el.dataset.cmLabel === 'long' ? commentsLabel(n) : String(n);
     el.hidden = n === 0;
-    el.closest('.act-cm-btn')?.setAttribute('aria-label', `Comentar (${n})`);
   }
 }
 
@@ -272,7 +301,7 @@ export const globalActions = {
     const people = await ctx.backend.getKudoers(id);
     sheet(`
       <div class="kudos-sheet">
-        <h2>🙌 ¡Vamos! <span class="muted">${people.length}</span></h2>
+        <h2>${icon('racket')} ¡Vamos! <span class="muted">${people.length}</span></h2>
         ${people.length
           ? `<ul class="kudos-list">${people.map((p) => kudoerRow(p, ctx.me?.id)).join('')}</ul>`
           : '<p class="muted">Aún nadie ha dado ¡Vamos! a esta actividad.</p>'}

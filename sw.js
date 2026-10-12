@@ -1,12 +1,20 @@
 // Service worker: guarda la app en caché para que abra rápido y funcione sin conexión (p. ej. en el club).
 // Los datos de la red social (Supabase) y las fotos nunca se cachean aquí: siempre van a la red.
-const CACHE = 'padelfit-v3';
+const CACHE = 'padelfit-v4';
 const ASSETS = [
   './',
   'index.html',
   'manifest.webmanifest',
   'icons/icon.svg',
+  'css/fonts.css',
   'css/styles.css',
+  'css/components.css',
+  'fonts/barlow-400.woff2',
+  'fonts/barlow-500.woff2',
+  'fonts/barlow-600.woff2',
+  'fonts/barlow-700.woff2',
+  'fonts/barlow-semi-condensed-600.woff2',
+  'fonts/barlow-semi-condensed-700.woff2',
   'css/social.css',
   'css/publish.css',
   'css/train.css',
@@ -14,6 +22,7 @@ const ASSETS = [
   'js/app.js',
   'js/config.js',
   'js/ui.js',
+  'js/icons.js',
   'js/photos.js',
   'js/components.js',
   'js/activities.js',

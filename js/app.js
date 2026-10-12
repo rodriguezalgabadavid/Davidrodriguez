@@ -23,6 +23,23 @@ const VIEWS = Object.fromEntries(
     .map((v) => [v.route, v]),
 );
 const REQUIRED_PARAMS = { actividad: ['id'] };
+
+// Título de la barra superior (como en Strava). En inicio y en la bienvenida se ve la marca.
+// Una vista puede definir `title` (texto o función de ctx) para cambiarlo.
+const ROUTE_TITLES = {
+  retos: 'Retos',
+  publicar: 'Publicar',
+  entrenar: 'Entrenar',
+  ejercicios: 'Ejercicios',
+  premium: 'Premium',
+  notificaciones: 'Notificaciones',
+  buscar: 'Buscar jugadores',
+  ajustes: 'Ajustes',
+  actividad: 'Actividad',
+};
+const BRAND_ROUTES = new Set(['inicio', 'bienvenida']);
+// Pantallas principales (pestañas): sin flecha de volver. El resto la lleva en la barra superior.
+const TAB_ROUTES = new Set(['inicio', 'retos', 'publicar', 'entrenar', 'perfil']);
 const DEFAULT_ROUTE = 'inicio';
 const ONBOARDING_ROUTE = 'bienvenida';
 
@@ -45,6 +62,27 @@ const $view = document.getElementById('view');
 const $tabbar = document.querySelector('.tabbar');
 const $topbar = document.querySelector('.topbar');
 const $notifCount = document.getElementById('notif-count');
+const $brand = document.getElementById('topbar-brand');
+const $title = document.getElementById('topbar-title');
+const $start = document.getElementById('topbar-start');
+const $back = document.getElementById('topbar-back');
+
+function setTopbar(route, view, ctx) {
+  let title = ROUTE_TITLES[route] ?? '';
+  if (route === 'perfil') title = !ctx.params.id || ctx.params.id === ctx.me?.id ? 'Tú' : 'Perfil';
+  try {
+    if (view.title) title = typeof view.title === 'function' ? view.title(ctx) : view.title;
+  } catch {
+    // Un título que falla no debe romper la pantalla.
+  }
+  const brand = BRAND_ROUTES.has(route) || !title;
+  const isTab = TAB_ROUTES.has(route) && !(route === 'perfil' && ctx.params.id && ctx.params.id !== ctx.me?.id);
+  $brand.hidden = !brand;
+  $start.hidden = brand;
+  $back.hidden = isTab;
+  $title.textContent = brand ? '' : title;
+  document.title = brand ? 'PadelFit' : `${title} · PadelFit`;
+}
 
 const app = {
   backend: null,
@@ -147,6 +185,7 @@ async function render({ scrollTop = false } = {}) {
 
   if (changed) $view.innerHTML = loading();
   const ctx = makeCtx(route);
+  setTopbar(route, view, ctx);
   let html;
   try {
     html = await view.render(ctx);
@@ -210,6 +249,8 @@ document.addEventListener('click', (event) => {
   if (el.tagName === 'A' && !el.getAttribute('href')?.startsWith('http')) event.preventDefault();
   runAction(el.dataset.action, el, event);
 });
+
+$back.addEventListener('click', () => back());
 
 document.addEventListener('submit', (event) => {
   const form = event.target.closest('form[data-submit]');

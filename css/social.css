@@ -1,194 +1,9 @@
-/* ==========================================================================
-   Social: tarjeta de actividad, "¡Vamos!", comentarios, muro, notificaciones
-   y búsqueda. Solo tokens de styles.css (el modo oscuro llega por ellos).
-   Prefijos: act-, kudos-, cm-, card-, feed-, notif-, search-.
-   ========================================================================== */
 
-/* ---------- Tarjeta de actividad ---------- */
-
-.act-card {
-  --type: var(--t-entreno);
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  padding: 0.9rem 1rem 0.4rem;
-  overflow: hidden;
-  min-width: 0;
-}
-.act-linked { cursor: pointer; transition: border-color 0.15s; }
-.act-linked:hover { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); }
-
-.act-head { display: flex; align-items: center; gap: 0.65rem; min-width: 0; }
-.act-avatar { display: inline-flex; border-radius: 50%; text-decoration: none; }
-.act-who { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.act-name-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0 0.1rem; min-width: 0; }
-.act-name {
-  color: var(--text);
-  font-weight: 700;
-  text-decoration: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-.act-name:hover { text-decoration: underline; }
-.act-meta { font-size: 0.8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.act-type {
-  width: 2.25rem;
-  height: 2.25rem;
-  flex-shrink: 0;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 1.05rem;
-  background: color-mix(in srgb, var(--type) 18%, var(--surface));
-}
-
-.act-demo {
-  display: inline-block;
-  margin-left: 0.35rem;
-  padding: 0 0.4rem;
-  border: 1px dashed var(--warn);
-  border-radius: 999px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  line-height: 1.5;
-  color: var(--warn);
-  background: var(--warn-soft);
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-.act-title { margin: 0; font-size: 1.15rem; line-height: 1.25; overflow-wrap: anywhere; }
-h1.act-title { font-size: 1.4rem; }
-.act-title-link { color: inherit; text-decoration: none; }
-.act-title-link:hover { text-decoration: underline; text-underline-offset: 3px; }
-
-.act-match { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.75rem; }
-.act-score { font-weight: 800; font-size: 1.05rem; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
-.act-scoreboard { margin: 0.1rem 0; }
-.act-people { margin: 0; font-size: 0.9rem; color: var(--muted); overflow-wrap: anywhere; }
-.act-people strong { color: var(--text); font-weight: 600; }
-.act-plan { margin: 0; font-size: 0.85rem; font-weight: 600; color: var(--primary); }
-
-.act-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.act-text-clamp {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.act-stats { display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; margin: 0; }
-.act-stats > div { display: flex; flex-direction: column; }
-.act-stats dt { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.act-stats dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
-
-/* Foto a sangre dentro de la tarjeta (anula el padding lateral de .card). */
-.act-photo {
-  margin: 0.1rem -1rem 0;
-  aspect-ratio: 4 / 3;
-  background: var(--bg);
-  overflow: hidden;
-}
-.act-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
-
-/* Pie: "¡Vamos!", comentar y quién ha dado "¡Vamos!". */
-.act-foot {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0 -0.5rem;
-  padding: 0.3rem 0 0;
-  border-top: 1px solid var(--border);
-}
-.act-photo + .act-foot { border-top: 0; }
-
-.kudos-btn,
-.act-cm-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 2.75rem;
-  padding: 0.35rem 0.75rem;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: none;
-  color: var(--muted);
-  font-weight: 700;
-  font-size: 0.9rem;
-}
-.kudos-btn:hover,
-.act-cm-btn:hover { background: var(--bg); }
-.kudos-icon { font-size: 1.15rem; filter: grayscale(1); opacity: 0.75; transition: filter 0.15s, opacity 0.15s; }
-.kudos-count,
-.act-cm-count { font-variant-numeric: tabular-nums; }
-.act-cm-btn > span:first-child { font-size: 1.1rem; }
-
-.kudos-btn.kudos-on {
-  color: var(--text);
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 28%, var(--surface));
-}
-.kudos-btn.kudos-on .kudos-icon { filter: none; opacity: 1; }
-
-/* En mis actividades no me doy "¡Vamos!": el botón solo enseña cuántos llevo. */
-.kudos-own .kudos-icon { filter: none; opacity: 1; }
-
-.kudos-pop .kudos-icon { animation: kudos-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
 @keyframes kudos-pop {
   0% { transform: scale(1); }
   40% { transform: scale(1.45) rotate(-10deg); }
   100% { transform: scale(1) rotate(0); }
 }
-
-.kudos-who {
-  margin-left: auto;
-  min-height: 2.75rem;
-  padding: 0 0.5rem;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.kudos-who:hover { color: var(--text); text-decoration: underline; }
-
-@media (prefers-reduced-motion: reduce) {
-  .kudos-pop .kudos-icon { animation: none; }
-}
-
-/* Hoja con quién ha dado "¡Vamos!". */
-.kudos-sheet h2 { padding-right: 2.5rem; }
-.kudos-sheet h2 .muted { font-size: 1rem; }
-.kudos-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.kudos-person {
-  width: 100%;
-  min-height: 3.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.35rem 0.4rem;
-  border: 0;
-  border-radius: 12px;
-  background: none;
-  text-align: left;
-}
-.kudos-person:hover { background: var(--bg); }
-.kudos-person-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-
-/* Botón seguir / siguiendo (tarjetas de jugador, búsqueda, sugerencias). */
-.card-follow {
-  flex-shrink: 0;
-  min-height: 2.5rem;
-  padding: 0.45rem 1rem;
-  font-size: 0.88rem;
-  white-space: nowrap;
-}
-.card-follow[aria-pressed='true'] { color: var(--muted); }
-.card-follow:disabled { opacity: 0.6; cursor: progress; }
 
 /* ---------- Detalle de actividad ---------- */
 
@@ -389,8 +204,6 @@ button.feed-tile:hover { border-color: color-mix(in srgb, var(--primary) 35%, va
 .feed-person-link .avatar { margin-bottom: 0.25rem; }
 .feed-person-name { max-width: 100%; font-weight: 700; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feed-person-club { max-width: 100%; min-height: 1.2em; font-size: 0.78rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.feed-person .act-demo { margin-left: 0; }
-.feed-person .card-follow { width: 100%; margin-top: auto; }
 .feed-suggest-refresh { margin: 0; }
 .feed-suggest-refresh .btn { width: 100%; }
 
@@ -461,7 +274,6 @@ a.notif-item:hover { background: var(--bg); }
 .notif-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
 .notif-text { font-size: 0.92rem; line-height: 1.35; overflow-wrap: anywhere; }
 .notif-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.2rem; font-size: 0.78rem; color: var(--muted); }
-.notif-meta .act-demo { margin-left: 0.2rem; }
 .notif-thumb {
   flex-shrink: 0;
   width: 2.75rem;
