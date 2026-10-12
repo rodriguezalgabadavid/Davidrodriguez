@@ -132,7 +132,7 @@ async function render({ scrollTop = false } = {}) {
   const changed = app.current?.route !== route;
   app.current = { route, view };
 
-  document.body.dataset.route = route;
+  document.body.dataset.view = route;
   $tabbar.hidden = route === ONBOARDING_ROUTE;
   $topbar.querySelector('.topbar-actions').hidden = route === ONBOARDING_ROUTE;
   document.querySelectorAll('.tabbar [data-route]').forEach((b) => b.classList.toggle('on', b.dataset.route === view.tab));

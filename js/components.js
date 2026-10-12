@@ -220,11 +220,12 @@ async function setFollow(el, ctx, following) {
 
 // ---------- Hoja "¡Vamos!" ----------
 
-function kudoerRow(p) {
+function kudoerRow(p, meId) {
+  const isMe = Boolean(meId) && p.id === meId;
   return `
     <li>
-      <button class="kudos-person" data-route="perfil" data-param-id="${attr(p.id)}">
-        ${avatar(p)}<span class="kudos-person-name">${escapeHtml(p.name)}</span>${premiumBadge(p)}${demoTag(p)}
+      <button class="kudos-person" data-route="perfil" ${isMe ? '' : `data-param-id="${attr(p.id)}"`}>
+        ${avatar(p)}<span class="kudos-person-name">${isMe ? 'Tú' : escapeHtml(p.name)}</span>${premiumBadge(p)}${demoTag(p)}
       </button>
     </li>`;
 }
@@ -273,7 +274,7 @@ export const globalActions = {
       <div class="kudos-sheet">
         <h2>🙌 ¡Vamos! <span class="muted">${people.length}</span></h2>
         ${people.length
-          ? `<ul class="kudos-list">${people.map(kudoerRow).join('')}</ul>`
+          ? `<ul class="kudos-list">${people.map((p) => kudoerRow(p, ctx.me?.id)).join('')}</ul>`
           : '<p class="muted">Aún nadie ha dado ¡Vamos! a esta actividad.</p>'}
       </div>`);
   },

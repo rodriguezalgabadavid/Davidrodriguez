@@ -33,7 +33,8 @@ function kudoersRow(activityId, isMine, kudoers, meId) {
     </button>`;
 }
 
-function commentItem(c, now) {
+// canDelete: el autor del comentario o el dueño de la actividad (modera su publicación).
+function commentItem(c, now, canDelete = c.isMine) {
   const author = c.author ?? { id: '', name: 'Jugador' };
   return `
     <li class="cm-item" data-comment-id="${escapeHtml(c.id)}">
@@ -42,7 +43,7 @@ function commentItem(c, now) {
         <div class="cm-head">
           <a class="cm-name" ${profileLink(author.id)}>${escapeHtml(author.name)}</a>${premiumBadge(author)}${demoTag(author)}
           <time class="cm-time" datetime="${escapeHtml(c.createdAt)}" title="${escapeHtml(formatWhen(c.createdAt, now))}">${escapeHtml(timeAgo(c.createdAt, now))}</time>
-          ${c.isMine ? `<button class="cm-delete" data-action="delete-comment" data-comment-id="${escapeHtml(c.id)}" aria-label="Borrar comentario">✕</button>` : ''}
+          ${canDelete ? `<button class="cm-delete" data-action="delete-comment" data-comment-id="${escapeHtml(c.id)}" aria-label="Borrar comentario">✕</button>` : ''}
         </div>
         <p class="cm-text">${escapeHtml(c.text)}</p>
       </div>
@@ -107,7 +108,7 @@ export default {
 
         <section class="card cm-section" aria-labelledby="cm-title">
           <h2 id="cm-title" class="cm-title">Comentarios <span class="cm-count" data-cm-for="${escapeHtml(id)}"${n ? '' : ' hidden'}>${n}</span></h2>
-          <ol class="cm-list" id="cm-list">${comments.map((c) => commentItem(c, ctx.now)).join('')}</ol>
+          <ol class="cm-list" id="cm-list">${comments.map((c) => commentItem(c, ctx.now, c.isMine || activity.isMine)).join('')}</ol>
           <p class="cm-empty muted"${n ? ' hidden' : ''}>Aún no hay comentarios. ¡Anímale con el primero!</p>
         </section>
 

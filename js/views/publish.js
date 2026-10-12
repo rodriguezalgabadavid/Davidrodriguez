@@ -20,8 +20,8 @@ const RESULTS = [
 ];
 
 const RPE_LABELS = {
-  1: 'Muy suave', 2: 'Suave', 3: 'Moderado', 4: 'Algo duro', 5: 'Duro',
-  6: 'Duro', 7: 'Muy duro', 8: 'Muy duro', 9: 'Extremo', 10: 'Máximo',
+  1: 'Muy suave', 2: 'Suave', 3: 'Cómodo', 4: 'Moderado', 5: 'Algo duro',
+  6: 'Duro', 7: 'Muy duro', 8: 'Intenso', 9: 'Casi al límite', 10: 'Máximo',
 };
 
 const MAX_MINUTES = 600;
@@ -31,6 +31,7 @@ const FUTURE_SLACK_MS = 5 * 60 * 1000;
 // Estado del borrador que no vive en el DOM. Se limpia al salir de la vista y en cada render.
 let photo = null; // { blob, url }
 let durationTouched = false;
+let clubTouched = false;
 let busy = false;
 let mounted = false;
 
@@ -42,6 +43,16 @@ function clearPhoto() {
 function resetDraft() {
   clearPhoto();
   durationTouched = false;
+  clubTouched = false;
+}
+
+// El club del perfil se propone para partidos y clases; un entreno suele ser en casa o en el gimnasio.
+const clubFor = (type, myClub) => (type === 'entreno' ? '' : myClub ?? '');
+
+function endOfDay(date) {
+  const d = new Date(date);
+  d.setHours(23, 59, 0, 0);
+  return d;
 }
 
 // ---------- Render ----------
@@ -199,11 +210,11 @@ function clearError(form) {
   el.textContent = '';
 }
 
-function setBusy(form, on) {
+function setBusy(form, on, label = on ? 'Publicando…' : 'Publicar') {
   const button = form.querySelector('.post-submit');
   button.disabled = on;
   button.setAttribute('aria-busy', String(on));
-  button.textContent = on ? 'Publicando…' : 'Publicar';
+  button.textContent = label;
 }
 
 function applyType(form, type) {
@@ -211,6 +222,7 @@ function applyType(form, type) {
     el.hidden = el.dataset.only !== type;
   });
   if (!durationTouched) form.elements.minutes.value = ACTIVITY_TYPES[type].defaultMinutes;
+  if (!clubTouched) form.elements.club.value = clubFor(type, form.elements.club.dataset.default);
   clearError(form);
 }
 
@@ -329,7 +341,7 @@ export default {
             <div class="field-row">
               <div class="field">
                 <label class="field-label" for="post-date">Fecha y hora</label>
-                <input class="input" id="post-date" name="date" type="datetime-local" value="${toLocalInput(now)}" max="${toLocalInput(now.getTime() + 24 * 3600e3)}" />
+                <input class="input" id="post-date" name="date" type="datetime-local" value="${toLocalInput(now)}" max="${toLocalInput(endOfDay(now))}" />
               </div>
               <div class="field">
                 <label class="field-label" for="post-minutes">Duración (min)</label>
@@ -374,7 +386,8 @@ export default {
 
             <div class="field">
               <label class="field-label" for="post-club">Club o pista</label>
-              <input class="input" id="post-club" name="club" list="post-clubs" maxlength="40" autocomplete="off" value="${escapeHtml(me?.club ?? '')}" />
+              <input class="input" id="post-club" name="club" list="post-clubs" maxlength="40" autocomplete="off" data-input="club"
+                  value="${escapeHtml(clubFor(type, me?.club))}" data-default="${escapeHtml(me?.club ?? '')}" />
             </div>
             ${datalist('post-people', people)}
             ${datalist('post-clubs', clubs)}
@@ -402,6 +415,10 @@ export default {
 
     duration() {
       durationTouched = true;
+    },
+
+    club() {
+      clubTouched = true;
     },
 
     'toggle-sets'(el) {
@@ -491,6 +508,10 @@ export default {
       // Publicado: se limpia el borrador y se celebra lo conseguido.
       ctx.cache.before = null;
       resetDraft();
+      if (form.isConnected) {
+        renderPhoto(form);
+        setBusy(form, true, '¡Publicado!');
+      }
       try {
         const after = await snapshot(ctx).catch(() => null);
         await showCelebration(ctx, { activity, before, after });

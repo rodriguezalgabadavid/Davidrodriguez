@@ -1,0 +1,343 @@
+/* ==========================================================================
+   Entrenar: plan activo, catálogo de planes, sesión rápida, Premium y
+   biblioteca de ejercicios. Solo tokens de styles.css (el modo oscuro llega
+   por ellos). Prefijos: train-, plan-, prem-, lib-.
+   ========================================================================== */
+
+/* ---------- Cabecera y secciones ---------- */
+
+.train-head h1,
+.lib-head h1,
+.prem-head h1 { margin: 0; text-wrap: balance; }
+.train-head p,
+.lib-head p,
+.prem-head p { margin: 0.2rem 0 0; }
+
+.train-section { display: flex; flex-direction: column; gap: 0.6rem; }
+.train-section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.train-section-head h2 { margin: 0; }
+.train-section-sub { margin: -0.3rem 0 0; }
+
+/* ---------- Cabecera de plan (icono + nombre) ---------- */
+
+.plan-head { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+.plan-head-text { display: flex; flex-direction: column; min-width: 0; }
+.plan-head-text h1,
+.plan-head-text h2,
+.plan-head-text h3 { margin: 0; overflow-wrap: anywhere; }
+.plan-head-text h1 { font-size: 1.4rem; }
+.plan-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  background: var(--primary-soft);
+}
+.prem-icon { background: color-mix(in srgb, var(--accent) 32%, var(--surface)); }
+
+/* ---------- Plan activo ---------- */
+
+.plan-active {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  border-top: 4px solid var(--primary);
+}
+.plan-active.plan-premium { border-top-color: var(--accent); }
+.plan-active .muted,
+.plan-active .hint { margin: 0; }
+
+.plan-progress-line { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.plan-progress-line strong { font-size: 0.95rem; }
+
+.plan-bar { height: 10px; background: var(--border); border-radius: 999px; overflow: hidden; }
+.plan-bar > span { display: block; height: 100%; background: var(--primary); border-radius: inherit; transition: width 0.4s; }
+.plan-premium .plan-bar > span { background: linear-gradient(90deg, var(--primary), var(--accent)); }
+
+.plan-start { white-space: normal; line-height: 1.25; min-height: 3.25rem; }
+.plan-finished { margin: 0; font-weight: 700; color: var(--win); }
+
+.plan-active-links { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.25rem 1.5rem; }
+.plan-active-links .link { min-height: 2.75rem; }
+.plan-leave { color: var(--muted); font-weight: 500; font-size: 0.88rem; }
+
+.plan-badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* ---------- Catálogo de planes ---------- */
+
+.plan-list { display: grid; gap: 0.75rem; }
+.plan-card { display: flex; flex-direction: column; gap: 0.6rem; }
+.plan-card.is-active { border-color: var(--primary); }
+.plan-meta { font-size: 0.8rem; color: var(--muted); }
+.plan-desc { margin: 0; font-size: 0.9rem; }
+.plan-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+.plan-card-info { display: flex; align-items: center; gap: 0.5rem; }
+.plan-card-btn { min-height: 2.75rem; }
+.plan-done {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--win);
+  background: var(--win-soft);
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+}
+
+@media (min-width: 560px) {
+  .plan-list { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ---------- Sesión rápida ---------- */
+
+.train-quick h2 { margin-bottom: 0.2rem; }
+.train-quick > .muted { margin-bottom: 0.9rem; }
+.train-quick legend,
+.prem-quiz legend { padding: 0; }
+.train-quick .hint.center { margin-top: 0.6rem; }
+
+/* Chips de radio y casillas un poco más grandes para el dedo (≥ 44 px). */
+.train-quick .chip-radio,
+.prem-quiz .chip-radio { position: relative; }
+.train-quick .chip-radio span,
+.prem-quiz .chip-radio span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.95rem;
+}
+.train-quick .segmented label span { padding: 0.65rem 0.25rem; }
+
+/* ---------- Enlace a la biblioteca ---------- */
+
+.train-link,
+.prem-upsell {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+}
+.train-link-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  background: var(--bg);
+}
+.train-link-body,
+.prem-upsell-body { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; min-width: 0; }
+.train-link-go,
+.prem-upsell-go { font-size: 1.5rem; color: var(--muted); }
+.train-link:hover { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); }
+
+/* ---------- Premium: tarjeta en Entrenar ---------- */
+
+.prem-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+
+.prem-crown {
+  width: 3rem;
+  height: 3rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  background: color-mix(in srgb, var(--accent) 35%, var(--surface));
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.prem-upsell {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--surface)), var(--surface) 75%);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.prem-upsell:hover { border-color: var(--accent); }
+.prem-upsell:active { transform: scale(0.99); }
+.prem-upsell-title { font-size: 1.05rem; line-height: 1.25; }
+.prem-upsell-text { font-size: 0.85rem; color: var(--muted); }
+.prem-upsell-price { margin-top: 0.2rem; font-size: 0.85rem; font-weight: 700; }
+
+.prem-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), var(--surface) 70%);
+}
+.prem-card .muted,
+.prem-card-next { margin: 0; }
+
+/* ---------- Premium: paywall ---------- */
+
+.prem-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.55rem;
+  padding: 1.75rem 1.25rem 1.25rem;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  background:
+    radial-gradient(120% 75% at 50% 0%, color-mix(in srgb, var(--accent) 24%, var(--surface)), var(--surface) 72%);
+  box-shadow: var(--shadow);
+}
+.prem-hero h1 { margin: 0.1rem 0 0; font-size: 1.65rem; text-wrap: balance; }
+.prem-crown-lg { width: 4rem; height: 4rem; font-size: 2rem; margin-bottom: 0.25rem; }
+.prem-lead { margin: 0; color: var(--muted); max-width: 30rem; text-wrap: pretty; }
+
+.prem-price { display: flex; align-items: baseline; gap: 0.2rem; margin: 0.4rem 0 0.2rem; }
+.prem-price strong {
+  font-size: 2.3rem;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  padding: 0 0.15rem;
+  background: linear-gradient(transparent 62%, color-mix(in srgb, var(--accent) 55%, transparent) 0);
+}
+.prem-price span { color: var(--muted); font-weight: 600; }
+
+.prem-cta { box-shadow: 0 6px 18px color-mix(in srgb, var(--primary) 28%, transparent); }
+.prem-hero .prem-cta { max-width: 22rem; }
+.prem-small { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.prem-demo {
+  margin: 0.2rem 0 0;
+  padding: 0.4rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.prem-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.9rem; }
+.prem-list li { display: flex; align-items: flex-start; gap: 0.8rem; }
+.prem-list-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  background: color-mix(in srgb, var(--accent) 24%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.prem-list-body { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.prem-list-body .muted { font-size: 0.86rem; }
+
+.prem-free h3 { margin-bottom: 0.2rem; }
+.prem-free p { margin: 0; }
+
+/* ---------- Premium: cuestionario ---------- */
+
+.prem-head { display: flex; flex-direction: column; gap: 0.1rem; }
+.prem-quiz { display: flex; flex-direction: column; gap: 1.1rem; }
+.prem-q { display: flex; flex-direction: column; gap: 0.1rem; }
+.prem-q .hint { margin-top: 0.4rem; }
+.prem-quiz .btn.big + .btn.big { margin-top: -0.4rem; }
+
+/* ---------- Premium: plan personalizado ---------- */
+
+.prem-plan { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface) 55%); }
+
+.prem-notes h2 { margin-bottom: 0.4rem; }
+.prem-notes-list { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.45rem; font-size: 0.92rem; }
+.prem-notes-list li::marker { color: var(--warn); }
+
+.prem-weeks { display: grid; gap: 0.75rem; }
+@media (min-width: 560px) {
+  .prem-weeks { grid-template-columns: repeat(2, 1fr); }
+}
+
+.plan-week { padding-bottom: 0.4rem; }
+.plan-week.is-current { border-color: color-mix(in srgb, var(--accent) 65%, var(--border)); }
+.plan-week-title { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem; }
+
+.plan-sessions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.plan-session {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.plan-session:last-child { border-bottom: 0; }
+.plan-session-mark {
+  width: 1.9rem;
+  height: 1.9rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--muted);
+  border: 2px solid var(--border);
+}
+.plan-session-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.plan-session-body strong { font-size: 0.92rem; }
+.plan-session-body .muted { font-size: 0.8rem; }
+
+.plan-session.is-done .plan-session-mark { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.plan-session.is-done .plan-session-body strong { color: var(--muted); font-weight: 600; }
+
+.plan-session.is-next {
+  margin: 0.15rem -0.55rem;
+  padding: 0.55rem;
+  border-radius: 12px;
+  border-bottom-color: transparent;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+}
+.plan-session.is-next .plan-session-mark { border-color: var(--accent); color: var(--text); }
+.plan-session-tag {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--warn);
+  white-space: nowrap;
+}
+
+.prem-manage-status { margin: 0; font-weight: 600; }
+.prem-manage .actions { margin-top: 0.75rem; }
+
+/* ---------- Biblioteca de ejercicios ---------- */
+
+.lib-filters { padding-bottom: 0.75rem; }
+.lib-search { margin-bottom: 0.6rem; min-height: 2.75rem; }
+.lib-search-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.lib-chips .chip { min-height: 2.5rem; }
+.lib-count { margin: -0.4rem 0 -0.4rem; font-size: 0.82rem; color: var(--muted); }
+.lib-results .empty-state { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.lib-exercise summary { min-height: 2.75rem; }

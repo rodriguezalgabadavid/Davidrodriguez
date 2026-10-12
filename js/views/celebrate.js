@@ -71,18 +71,20 @@ function pct(value, target) {
 // Qué ha cambiado entre los dos snapshots. Si falta alguno, no se puede comparar: nada "nuevo".
 export function diffSnapshots(before, after) {
   if (!before || !after) {
-    return { unlocked: [], progressed: [], streak: after?.streak ?? null, streakGrew: false };
+    return { unlocked: [], progressed: [], streak: after?.streak ?? null, streakGrew: false, streakDelta: 0 };
   }
   const prev = new Map((before.challenges ?? []).map((c) => [c.instanceId, c]));
   const progressed = (after.challenges ?? [])
     .map((c) => ({ ...c, before: prev.get(c.instanceId) }))
-    .filter((c) => c.before && c.value > c.before.value)
+    .filter((c) => c.before && !c.before.done && c.value > c.before.value)
     .map((c) => ({ ...c, completedNow: c.done && !c.before.done }));
+  const streakDelta = after.streak && before.streak ? Math.max(0, after.streak.weeks - before.streak.weeks) : 0;
   return {
     unlocked: newlyUnlocked(before.achievements, after.achievements),
     progressed,
     streak: after.streak ?? null,
-    streakGrew: Boolean(after.streak && before.streak && after.streak.weeks > before.streak.weeks),
+    streakGrew: streakDelta > 0,
+    streakDelta,
   };
 }
 
@@ -140,20 +142,20 @@ function challengesHtml(list, offset) {
     </section>`;
 }
 
-function streakHtml(streak, grew, index) {
+function streakHtml(streak, delta, index) {
   if (!streak?.weeks) return '';
   const weeks = streak.weeks;
-  const label = `🔥 ${weeks} ${weeks === 1 ? 'semana' : 'semanas'} ${weeks === 1 ? 'en racha' : 'seguidas'}`;
-  const text = grew
-    ? weeks === 1
-      ? '¡Racha iniciada! Haz algo cada semana para alargarla.'
-      : 'Una actividad por semana y la racha sigue creciendo.'
-    : 'Esta semana ya cuenta para tu racha.';
+  const label = weeks === 1 ? '🔥 1 semana en racha' : `🔥 ${weeks} semanas seguidas`;
+  let text;
+  if (!streak.activeThisWeek) text = 'Publica algo esta semana para que no se corte.';
+  else if (delta && weeks === 1) text = '¡Racha iniciada! Haz algo cada semana para alargarla.';
+  else if (delta) text = 'Una actividad por semana y la racha sigue creciendo.';
+  else text = 'Esta semana ya cuenta para tu racha.';
   return `
     <section class="cel-section">
-      <div class="cel-item cel-streak${grew ? ' cel-pop' : ''}" style="--i:${index}">
+      <div class="cel-item cel-streak${delta ? ' cel-pop' : ''}" style="--i:${index}">
         <span class="cel-item-body">
-          <strong>${escapeHtml(label)}${grew ? ' <span class="cel-plus">+1</span>' : ''}</strong>
+          <strong>${escapeHtml(label)}${delta ? ` <span class="cel-plus">+${delta}</span>` : ''}</strong>
           <span class="muted">${escapeHtml(text)}</span>
         </span>
       </div>
@@ -181,7 +183,7 @@ function celebrationHtml(ctx, { activity, before, after }) {
       </header>
       ${achievementsHtml(diff.unlocked)}
       ${challengesHtml(diff.progressed, diff.unlocked.length)}
-      ${streakHtml(diff.streak, diff.streakGrew, diff.unlocked.length + diff.progressed.length)}
+      ${streakHtml(diff.streak, diff.streakDelta, diff.unlocked.length + diff.progressed.length)}
       ${nothingNew ? '<p class="cel-cheer">Ya está en tu muro y en tu perfil. ¡Cada actividad cuenta!</p>' : ''}
       <p class="cel-hint">👏 Tus amigos ya pueden darte ¡Vamos!${demo ? ' <span class="muted">(En la demo reaccionan jugadores de ejemplo.)</span>' : ''}</p>
       <button type="button" class="btn primary big cel-close" data-cel-close>¡Seguir!</button>
