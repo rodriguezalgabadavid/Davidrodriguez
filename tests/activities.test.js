@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  activityTitle, formatScore, fromLegacy, knownNames, matchOutcome, matchWon, normalizeActivityInput, parseSets, sessionLoad,
+  activityTitle, formatScore, fromLegacy, knownNames, matchOutcome, matchWon, normalizeActivityInput, parseSets, sanitizeSets,
+  sessionLoad,
 } from '../js/activities.js';
 
 const INPUT_KEYS = ['type', 'date', 'seconds', 'rpe', 'won', 'sets', 'matchKind', 'partner', 'rivals', 'club', 'title', 'text', 'plan', 'focus'].sort();
@@ -182,4 +183,10 @@ test('knownNames agrupa sin distinguir mayúsculas', () => {
   ]);
   assert.equal(names.people.length, 3);
   assert.equal(names.clubs.length, 1);
+});
+
+test('sanitizeSets solo deja pares de enteros 0-99 (lo que venga del servidor)', () => {
+  assert.deepEqual(sanitizeSets([[6, 4], ['<img src=x onerror=alert(1)>', 1], [5], 5, [6.5, 3], [100, 0], [7, 7], ['6', '3']]), [[6, 4], [6, 3]]);
+  assert.deepEqual(sanitizeSets('no es una lista'), []);
+  assert.deepEqual(sanitizeSets(null), []);
 });

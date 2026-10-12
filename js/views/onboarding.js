@@ -46,12 +46,23 @@ function heroHtml() {
     </div>`;
 }
 
+// Además del enlace, el correo trae un código de 6 cifras: es la forma de entrar en la app instalada en
+// iPhone, donde el enlace se abre en Safari y la sesión no llega a la app.
 function sentHtml(email) {
   return `
     <div class="card onb-card onb-sent" role="status">
       <span class="onb-sent-icon" aria-hidden="true">📬</span>
       <h2>Te hemos enviado un enlace a tu correo</h2>
       <p class="muted">Ábrelo desde <strong>${escapeHtml(email)}</strong> en este dispositivo para entrar. Si no lo ves, mira en spam.</p>
+      <form class="onb-code" data-submit="verify-code" novalidate>
+        <label class="field-label" for="onb-code">¿Usas la app instalada? Escribe el código del correo</label>
+        <div class="onb-code-row">
+          <input class="input" id="onb-code" name="code" inputmode="numeric" autocomplete="one-time-code"
+            maxlength="6" pattern="[0-9]{6}" placeholder="123456" />
+          <button class="btn primary" type="submit">Entrar</button>
+        </div>
+        <p class="form-error" role="alert" hidden></p>
+      </form>
       <button type="button" class="link onb-link" data-action="other-email">Usar otro correo</button>
     </div>`;
 }
@@ -346,6 +357,28 @@ export default {
         showError(form, error.message || 'No se ha podido enviar el enlace. Inténtalo de nuevo.');
         button.disabled = false;
         button.textContent = 'Enviarme el enlace';
+      } finally {
+        busy = false;
+      }
+    },
+
+    async 'verify-code'(form, ctx) {
+      if (busy || !sentTo) return;
+      clearError(form);
+      const code = form.elements.namedItem('code').value.replace(/\s+/g, '');
+      if (!/^\d{6}$/.test(code)) {
+        showError(form, 'El código tiene 6 cifras.');
+        return;
+      }
+      const button = form.querySelector('button[type="submit"]');
+      busy = true;
+      button.disabled = true;
+      try {
+        // Al validarse, el backend avisa del cambio de sesión y la app pasa al paso del perfil.
+        await ctx.backend.verifyEmailCode(sentTo, code);
+      } catch (error) {
+        showError(form, error.message || 'El código no es válido. Pide uno nuevo.');
+        button.disabled = false;
       } finally {
         busy = false;
       }

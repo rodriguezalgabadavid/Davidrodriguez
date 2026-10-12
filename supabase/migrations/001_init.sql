@@ -29,12 +29,15 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+-- Una fila por suscripción de Stripe: un mismo usuario puede llegar a tener varias (pagar dos
+-- veces, o que otro pague con su id). premium_until se calcula sobre todas las suyas.
 create table if not exists public.subscriptions (
-  user_id uuid primary key references auth.users (id) on delete cascade,
+  stripe_subscription_id text primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
   stripe_customer_id text,
-  stripe_subscription_id text unique,
   status text,
   current_period_end timestamptz,
+  cancel_at_period_end boolean not null default false,
   updated_at timestamptz not null default now()
 );
 
@@ -47,15 +50,24 @@ create table if not exists public.activities (
   rpe smallint check (rpe between 1 and 10),
   won boolean,
   -- [[juegos nuestros, juegos suyos], ...]; [] si no se apuntó el marcador
+  -- Solo pares [entero 0-99, entero 0-99]: la app pinta estos valores en el marcador.
   sets jsonb not null default '[]'::jsonb
-    check (case when jsonb_typeof(sets) = 'array' then jsonb_array_length(sets) <= 5 else false end),
+    check (case when jsonb_typeof(sets) = 'array' then
+      jsonb_array_length(sets) <= 5
+      and not jsonb_path_exists(sets, 'strict $[*] ? (@.type() != "array" || @.size() != 2)')
+      and not jsonb_path_exists(sets, 'strict $[*][*] ? (@.type() != "number" || @ < 0 || @ > 99 || @ != @.floor())')
+    else false end),
   match_kind text check (match_kind in ('amistoso', 'liga', 'torneo', 'americana')),
   partner text not null default '' check (char_length(partner) <= 80),
   rivals text[] not null default '{}' check (cardinality(rivals) <= 10),
   club text not null default '' check (char_length(club) <= 80),
   title text not null default '' check (char_length(title) <= 140),
   body text not null default '' check (char_length(body) <= 2000),
-  photo_path text,            -- ruta dentro del bucket 'photos': '<uid>/<archivo>.jpg'
+  -- Ruta dentro del bucket 'photos', siempre en la carpeta del autor: '<uid>/<archivo>.jpg'.
+  -- Nunca una URL externa (cargaría imágenes de terceros en el muro de los demás).
+  photo_path text check (photo_path is null or (
+    split_part(photo_path, '/', 1) = user_id::text and photo_path ~ '^[0-9a-f-]+/[A-Za-z0-9._-]+$'
+  )),
   plan_id text,
   plan_session text,
   focus text,
@@ -137,6 +149,7 @@ create index if not exists comments_activity_created_idx on public.comments (act
 create index if not exists follows_following_idx on public.follows (following_id);
 create index if not exists notifications_user_created_idx on public.notifications (user_id, created_at desc);
 create index if not exists notifications_unread_idx on public.notifications (user_id) where not read;
+create index if not exists subscriptions_user_idx on public.subscriptions (user_id);
 
 -- =====================================================================================
 -- 3. Normalización (triggers before): convierten null en '' / [] para que un insert con
@@ -149,6 +162,12 @@ language plpgsql
 set search_path = public
 as $$
 begin
+  -- Empezar el plan personalizado exige Premium (si caduca después, el plan no se corta).
+  if new.active_plan_id = 'premium'
+     and (tg_op = 'INSERT' or old.active_plan_id is distinct from 'premium')
+     and not (new.premium_until is not null and new.premium_until > now()) then
+    raise exception 'El plan personalizado es para usuarios Premium.' using errcode = '42501';
+  end if;
   new.name := btrim(new.name);
   new.level := coalesce(new.level, 1);
   new.position := nullif(new.position, '');
@@ -308,6 +327,25 @@ create trigger follows_notify
   after insert or delete on public.follows
   for each row execute function public.notify_follow();
 
+-- ¿El usuario actual tiene Premium? (security definer para que RLS pueda consultarlo.)
+create or replace function public.is_premium()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and premium_until > now());
+$$;
+revoke all on function public.is_premium() from public;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function public.is_premium() to authenticated;
+  end if;
+end;
+$$;
+
 -- =====================================================================================
 -- 5. Row Level Security
 --    (select auth.uid()) en lugar de auth.uid(): Postgres lo evalúa una vez por consulta.
@@ -426,7 +464,7 @@ drop policy if exists plan_progress_own on public.plan_progress;
 create policy plan_progress_own on public.plan_progress
   for all to authenticated
   using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
+  with check (user_id = (select auth.uid()) and (plan_id <> 'premium' or public.is_premium()));
 
 drop policy if exists plan_finishes_own on public.plan_finishes;
 create policy plan_finishes_own on public.plan_finishes
@@ -434,11 +472,12 @@ create policy plan_finishes_own on public.plan_finishes
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
+-- premium_answers: leer y borrar, el dueño; guardar respuestas nuevas exige Premium.
 drop policy if exists premium_answers_own on public.premium_answers;
 create policy premium_answers_own on public.premium_answers
   for all to authenticated
   using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
+  with check (user_id = (select auth.uid()) and public.is_premium());
 
 -- =====================================================================================
 -- 6. Privilegios por columna (segunda barrera además de RLS).
@@ -452,9 +491,10 @@ begin
     -- profiles: premium_until y created_at no se pueden escribir desde la app.
     -- (id está en update solo para que funcione un upsert; RLS impide cambiarlo.)
     revoke insert, update on table public.profiles from anon, authenticated;
-    grant insert (id, name, avatar_url, level, position, club, bio, active_plan_id, active_plan_started_at)
+    -- avatar_url tampoco: aún no hay subida de avatar y una URL externa filtraría la IP de quien la ve.
+    grant insert (id, name, level, position, club, bio, active_plan_id, active_plan_started_at)
       on table public.profiles to authenticated;
-    grant update (id, name, avatar_url, level, position, club, bio, active_plan_id, active_plan_started_at)
+    grant update (id, name, level, position, club, bio, active_plan_id, active_plan_started_at)
       on table public.profiles to authenticated;
 
     -- notifications: las crean los triggers; el usuario solo cambia "read".

@@ -112,7 +112,8 @@ function cleanRpe(value) {
 }
 
 // Sets válidos: pares de enteros 0-99 sin empate. Lo demás se descarta.
-function cleanSets(sets) {
+// Se aplica al guardar y también al leer del servidor: el marcador nunca pinta otra cosa que números.
+export function sanitizeSets(sets) {
   if (!Array.isArray(sets)) return [];
   const out = [];
   for (const pair of sets) {
@@ -144,7 +145,7 @@ function cleanPlan(plan) {
 export function normalizeActivityInput(input = {}) {
   const type = ACTIVITY_TYPES[input.type] ? input.type : 'entreno';
   const isMatch = type === 'partido';
-  const sets = isMatch ? cleanSets(input.sets) : [];
+  const sets = isMatch ? sanitizeSets(input.sets) : [];
   let won = null;
   if (isMatch) won = sets.length ? matchOutcome(sets).won : cleanWon(input.won);
   return {

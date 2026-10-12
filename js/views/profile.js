@@ -170,7 +170,7 @@ function partnersCard(stats) {
 
 function moreButton(ownerId, list) {
   if (list.length < PAGE) return '';
-  return `<button class="btn prof-more" data-action="more" data-owner="${attr(ownerId)}" data-before="${attr(list.at(-1).date)}">Ver más</button>`;
+  return `<button class="btn prof-more" data-action="more" data-owner="${attr(ownerId)}" data-before="${attr(list.at(-1).date)}" data-before-id="${attr(list.at(-1).id)}">Ver más</button>`;
 }
 
 function activitySection(list, ctx, { isMe, profile }) {
@@ -278,7 +278,7 @@ export default {
       el.textContent = 'Cargando…';
       let items;
       try {
-        items = await ctx.backend.getUserActivities(el.dataset.owner, { before: el.dataset.before, limit: PAGE });
+        items = await ctx.backend.getUserActivities(el.dataset.owner, { before: el.dataset.before, beforeId: el.dataset.beforeId, limit: PAGE });
       } catch (error) {
         el.disabled = false;
         el.textContent = 'Ver más';
@@ -291,6 +291,7 @@ export default {
         return;
       }
       el.dataset.before = items.at(-1).date;
+      el.dataset.beforeId = items.at(-1).id;
       el.disabled = false;
       el.textContent = 'Ver más';
     },

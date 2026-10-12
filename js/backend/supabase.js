@@ -2,7 +2,7 @@
 // notificaciones) + Stripe Payment Links para Premium. Cumple la interfaz de docs/ARCHITECTURE.md.
 // supabase-js se carga bajo demanda desde el CDN, así la versión demo no descarga nada.
 
-import { normalizeActivityInput, POSITIONS } from '../activities.js';
+import { normalizeActivityInput, POSITIONS, sanitizeSets } from '../activities.js';
 
 const SUPABASE_JS_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 const PHOTOS_BUCKET = 'photos';
@@ -44,6 +44,21 @@ const nowIso = () => new Date().toISOString();
 const cleanText = (s) => String(s ?? '').trim().replace(/\s+/g, ' ');
 const isDuplicate = (error) => error?.code === '23505';
 const isBadId = (error) => error?.code === '22P02'; // texto que no es un uuid válido
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Estados de Stripe con Premium hasta el final del periodo (past_due: cobro fallido que se reintenta).
+const LIVE_SUBSCRIPTION = ['active', 'trialing', 'past_due'];
+const CHECKOUT_FLAG = 'padelfit:checkout';
+
+// Paginación por (played_at, id): con solo played_at se perderían las actividades empatadas en la
+// fecha de la última de la página (p. ej. los 4 jugadores de un partido publicando la misma hora).
+function olderThan(query, before, beforeId) {
+  if (!before) return query;
+  const date = iso(before);
+  if (!beforeId || !UUID.test(beforeId)) return query.lt('played_at', date);
+  return query.or(`played_at.lt."${date}",and(played_at.eq."${date}",id.lt.${beforeId})`);
+}
+
+const newestFirst = (query) => query.order('played_at', { ascending: false }).order('id', { ascending: false });
 
 function randomId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
@@ -276,6 +291,19 @@ export class SupabaseBackend {
     this._fail(error, 'No se ha podido enviar el enlace. Revisa el email e inténtalo de nuevo.');
   }
 
+  // Código de 6 cifras del mismo email: necesario en la app instalada en iPhone, donde el enlace abre
+  // Safari y la sesión no llega a la app (cada una tiene su propio almacenamiento).
+  async verifyEmailCode(email, code) {
+    await this.init();
+    const address = String(email ?? '').trim().toLowerCase();
+    const token = String(code ?? '').replace(/\s+/g, '');
+    if (!/^\d{6}$/.test(token)) throw new Error('El código tiene 6 cifras.');
+    const { error } = await this._client.auth.verifyOtp({ email: address, token, type: 'email' });
+    if (!error) return;
+    if (error.status === 429) this._fail(error, 'Demasiados intentos. Espera un minuto.');
+    this._fail(error, 'El código no es válido o ha caducado. Pide uno nuevo.');
+  }
+
   async createProfile({ name, level = 2, position = null, club = '' } = {}) {
     const { sb, uid } = await this._auth();
     const fields = profilePatch({ name, level, position, club }, { requireName: true });
@@ -443,20 +471,18 @@ export class SupabaseBackend {
 
   // ---------- Actividades ----------
 
-  async getFeed({ before, limit = 20 } = {}) {
+  async getFeed({ before, beforeId, limit = 20 } = {}) {
     const { sb, uid } = await this._auth();
     const ids = [uid, ...(await this._followingIds(uid))];
-    let query = sb.from('activities').select(ACTIVITY_SELECT).in('user_id', ids);
-    if (before) query = query.lt('played_at', iso(before));
-    const rows = this._check(await query.order('played_at', { ascending: false }).limit(limit), MSG.feed);
+    const query = olderThan(sb.from('activities').select(ACTIVITY_SELECT).in('user_id', ids), before, beforeId);
+    const rows = this._check(await newestFirst(query).limit(limit), MSG.feed);
     return rows.map((row) => this._toActivity(row));
   }
 
-  async getUserActivities(userId, { before, limit = 20 } = {}) {
+  async getUserActivities(userId, { before, beforeId, limit = 20 } = {}) {
     const { sb } = await this._auth();
-    let query = sb.from('activities').select(ACTIVITY_SELECT).eq('user_id', userId);
-    if (before) query = query.lt('played_at', iso(before));
-    const { data, error } = await query.order('played_at', { ascending: false }).limit(limit);
+    const query = olderThan(sb.from('activities').select(ACTIVITY_SELECT).eq('user_id', userId), before, beforeId);
+    const { data, error } = await newestFirst(query).limit(limit);
     if (isBadId(error)) return [];
     if (error) this._fail(error, MSG.feed);
     return data.map((row) => this._toActivity(row));
@@ -531,9 +557,9 @@ export class SupabaseBackend {
       .catch((error) => console.error('[supabase]', error));
   }
 
+  // Solo rutas del bucket propio: nunca una URL externa (filtraría la IP de quien ve el muro).
   _photoUrl(path) {
-    if (!path) return null;
-    if (/^https?:\/\//.test(path)) return path;
+    if (!path || /^[a-z][a-z0-9+.-]*:/i.test(path)) return null;
     return this._client.storage.from(PHOTOS_BUCKET).getPublicUrl(path).data.publicUrl;
   }
 
@@ -549,7 +575,7 @@ export class SupabaseBackend {
       seconds: row.duration_seconds ?? 0,
       rpe: row.rpe ?? null,
       won: row.won ?? null,
-      sets: Array.isArray(row.sets) ? row.sets : [],
+      sets: sanitizeSets(row.sets),
       matchKind: row.match_kind ?? null,
       partner: row.partner ?? '',
       rivals: row.rivals ?? [],
@@ -801,17 +827,59 @@ export class SupabaseBackend {
   // ---------- Premium (Stripe) ----------
 
   async getSubscription() {
-    await this._auth();
+    const { sb, uid } = await this._auth();
     const row = await this._ownRow({ fresh: true });
-    return { active: isPremiumRow(row), renewsAt: iso(row?.premium_until), simulated: false };
+    const subs = this._check(
+      await sb.from('subscriptions').select('status, cancel_at_period_end').eq('user_id', uid),
+      MSG.premium,
+    );
+    const live = subs.filter((s) => LIVE_SUBSCRIPTION.includes(s.status));
+    return {
+      active: isPremiumRow(row),
+      renewsAt: iso(row?.premium_until),
+      // Se renueva sola salvo que el usuario la haya cancelado para final de periodo.
+      willRenew: live.some((s) => !s.cancel_at_period_end),
+      // Ha fallado un cobro: hay que actualizar la tarjeta en el portal de Stripe, no volver a pagar.
+      paymentIssue: live.some((s) => s.status === 'past_due'),
+      // Tiene una suscripción en Stripe que se puede gestionar desde el portal.
+      manageable: live.length > 0,
+      simulated: false,
+    };
   }
 
   // Redirige a Stripe. El webhook (Edge Function stripe-webhook) actualiza premium_until al pagar.
+  // La marca en sessionStorage permite a la vista mostrar "Activando tu Premium…" al volver, mientras
+  // el webhook termina (puede tardar unos segundos más que la redirección).
   async startCheckout() {
     const { uid } = await this._auth();
     const link = this.config.stripePaymentLink;
     if (!link) throw new Error('Los pagos aún no están configurados.');
+    try {
+      sessionStorage.setItem(CHECKOUT_FLAG, String(Date.now()));
+    } catch {
+      // Sin almacenamiento: al volver se verá el paywall hasta recargar.
+    }
     location.href = stripeUrl(link, { client_reference_id: uid, prefilled_email: this._session?.user?.email });
+  }
+
+  // ¿Volvemos de pagar en Stripe hace poco? (para esperar al webhook en lugar de mostrar el paywall)
+  checkoutPending() {
+    try {
+      const at = Number(sessionStorage.getItem(CHECKOUT_FLAG));
+      if (at && Date.now() - at < 15 * 60 * 1000) return true;
+      sessionStorage.removeItem(CHECKOUT_FLAG);
+    } catch {
+      // Sin almacenamiento: no hay marca.
+    }
+    return false;
+  }
+
+  clearCheckoutPending() {
+    try {
+      sessionStorage.removeItem(CHECKOUT_FLAG);
+    } catch {
+      // Nada que limpiar.
+    }
   }
 
   async manageSubscription() {

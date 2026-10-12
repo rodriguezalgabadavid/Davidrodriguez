@@ -91,6 +91,13 @@ function preferences(settings) {
 
 // ---------- Suscripción ----------
 
+function renewalHint(sub) {
+  if (sub.simulated) return 'Pago simulado de la demo: no se ha cobrado nada.';
+  if (sub.paymentIssue) return 'Ha fallado el último cobro: actualiza tu método de pago para no perder Premium.';
+  if (sub.willRenew === false) return 'Has cancelado la renovación: Premium sigue activo hasta esa fecha.';
+  return 'Se renueva sola cada mes. Puedes cancelarla cuando quieras.';
+}
+
 function subscriptionBlock(sub, demo) {
   if (!sub) {
     return `
@@ -106,10 +113,18 @@ function subscriptionBlock(sub, demo) {
       <section class="card set-card set-sub set-sub-on" aria-labelledby="set-sub-title">
         <h2 id="set-sub-title">Suscripción</h2>
         <p class="set-sub-status">${premiumBadge({ isPremium: true })} Premium activo${until ? ` hasta el ${escapeHtml(until)}` : ''}</p>
-        <p class="hint">${sub.simulated
-          ? 'Pago simulado de la demo: no se ha cobrado nada.'
-          : 'Se renueva sola cada mes. Puedes cancelarla cuando quieras.'}</p>
+        <p class="hint">${escapeHtml(renewalHint(sub))}</p>
         <button class="btn" data-action="manage-subscription">Gestionar suscripción</button>
+      </section>`;
+  }
+  if (sub.manageable) {
+    // Suscripción en Stripe sin Premium activo (cobro pendiente): se arregla en el portal, no pagando otra.
+    return `
+      <section class="card set-card set-sub" aria-labelledby="set-sub-title">
+        <h2 id="set-sub-title">Suscripción</h2>
+        <p class="set-sub-status">Premium en pausa</p>
+        <p class="muted">Hay un problema con el cobro de tu suscripción. Revisa tu método de pago para recuperar Premium.</p>
+        <button class="btn primary" data-action="manage-subscription">Gestionar suscripción</button>
       </section>`;
   }
   return `

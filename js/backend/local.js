@@ -2,7 +2,7 @@
 // de ejemplo, interacciones simuladas ("¡Vamos!", comentarios y seguidores que llegan unos segundos después)
 // y un pago Premium simulado. Cumple la interfaz de docs/ARCHITECTURE.md.
 
-import { fromLegacy, normalizeActivityInput, POSITIONS } from '../activities.js';
+import { fromLegacy, normalizeActivityInput, POSITIONS, sanitizeSets } from '../activities.js';
 import { blobToDataUrl } from '../photos.js';
 import { demoPost, randomId, reactionComment, seedCommunity } from './demo-data.js';
 
@@ -288,6 +288,10 @@ export class LocalBackend {
     throw new Error(MSG.demoSignIn);
   }
 
+  async verifyEmailCode() {
+    throw new Error(MSG.demoSignIn);
+  }
+
   async createProfile({ name, level = 2, position = null, club = '' } = {}) {
     const s = await this._ready();
     const fields = profilePatch({ name, level, position, club }, { requireName: true });
@@ -518,7 +522,7 @@ export class LocalBackend {
       seconds: r.seconds ?? 0,
       rpe: r.rpe ?? null,
       won: r.won ?? null,
-      sets: (r.sets ?? []).map(([a, b]) => [a, b]),
+      sets: sanitizeSets(r.sets),
       matchKind: r.matchKind ?? null,
       partner: r.partner ?? '',
       rivals: [...(r.rivals ?? [])],
@@ -535,22 +539,29 @@ export class LocalBackend {
     }));
   }
 
-  _page(records, { before, limit = 20 } = {}) {
+  // Paginación por (fecha, id), igual que el backend live: no se pierden actividades con la misma fecha.
+  _page(records, { before, beforeId, limit = 20 } = {}) {
     const cursor = before == null || before === '' ? NaN : time(before);
-    const max = Number.isNaN(cursor) ? Infinity : cursor;
     const size = Math.max(1, Math.round(Number(limit) || 20));
-    return this._toActivities(records.filter((a) => time(a.date) < max).sort(byDateDesc).slice(0, size));
+    const older = (a) => {
+      if (Number.isNaN(cursor)) return true;
+      const t = time(a.date);
+      return t < cursor || (beforeId != null && t === cursor && a.id < beforeId);
+    };
+    // El desempate tiene que ser el mismo criterio que el cursor: el id.
+    const newestFirst = (a, b) => time(b.date) - time(a.date) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
+    return this._toActivities(records.filter(older).sort(newestFirst).slice(0, size));
   }
 
-  async getFeed({ before, limit = 20 } = {}) {
+  async getFeed({ before, beforeId, limit = 20 } = {}) {
     await this._requireMe();
     const ids = this._circleIds();
-    return this._page(this._state.activities.filter((a) => ids.has(a.userId)), { before, limit });
+    return this._page(this._state.activities.filter((a) => ids.has(a.userId)), { before, beforeId, limit });
   }
 
-  async getUserActivities(userId, { before, limit = 20 } = {}) {
+  async getUserActivities(userId, { before, beforeId, limit = 20 } = {}) {
     const s = await this._ready();
-    return this._page(s.activities.filter((a) => a.userId === userId), { before, limit });
+    return this._page(s.activities.filter((a) => a.userId === userId), { before, beforeId, limit });
   }
 
   async getActivity(id) {
@@ -908,8 +919,17 @@ export class LocalBackend {
 
   async getSubscription() {
     await this._ready();
-    return { ...this._subscriptionStatus(), simulated: true };
+    const status = this._subscriptionStatus();
+    // El Premium simulado se renueva solo hasta que se cancela (y la cancelación es inmediata).
+    return { ...status, willRenew: status.active, paymentIssue: false, manageable: status.active, simulated: true };
   }
+
+  // En la demo no hay pasarela: no hay que esperar a ningún webhook al volver.
+  checkoutPending() {
+    return false;
+  }
+
+  clearCheckoutPending() {}
 
   async startCheckout() {
     await this._requireMe();

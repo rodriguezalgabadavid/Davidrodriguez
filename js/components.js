@@ -45,7 +45,7 @@ function scoreboard(sets) {
       ${sets.map(([a, b]) => {
         const mine = side === 0 ? a : b;
         const theirs = side === 0 ? b : a;
-        return `<td class="${mine > theirs ? 'set-won' : ''}">${mine}</td>`;
+        return `<td class="${mine > theirs ? 'set-won' : ''}">${escapeHtml(mine)}</td>`;
       }).join('')}
     </tr>`;
   return `

@@ -144,6 +144,7 @@ export default {
 
     cache.count = items.length;
     cache.lastDate = items.at(-1)?.date ?? null;
+    cache.lastId = items.at(-1)?.id ?? null;
     cache.topId = items[0]?.id ?? null;
 
     const onlyMine = items.every((a) => a.isMine);
@@ -214,7 +215,7 @@ export default {
       el.textContent = 'Cargando…';
       let items;
       try {
-        items = await ctx.backend.getFeed({ before: ctx.cache.lastDate ?? undefined, limit: PAGE });
+        items = await ctx.backend.getFeed({ before: ctx.cache.lastDate ?? undefined, beforeId: ctx.cache.lastId ?? undefined, limit: PAGE });
       } catch (error) {
         el.disabled = false;
         el.textContent = 'Ver más';
@@ -224,7 +225,10 @@ export default {
       const fresh = items.filter((a) => !seen.has(a.id));
       list.insertAdjacentHTML('beforeend', fresh.map((a) => activityCard(a, ctx)).join(''));
       ctx.cache.count = (ctx.cache.count || 0) + fresh.length;
-      if (items.length) ctx.cache.lastDate = items.at(-1).date;
+      if (items.length) {
+        ctx.cache.lastDate = items.at(-1).date;
+        ctx.cache.lastId = items.at(-1).id;
+      }
       if (items.length < PAGE) el.outerHTML = endNote;
       else {
         el.disabled = false;

@@ -1,7 +1,8 @@
 // Webhook de Stripe → Supabase: mantiene al día la suscripción Premium (19,99 €/mes).
 //
 // Qué hace: verifica la firma de Stripe y, con la clave service role (la única que puede escribir
-// premium_until), guarda la suscripción en `subscriptions` y fija `profiles.premium_until`.
+// premium_until), guarda cada suscripción en `subscriptions` (una fila por suscripción de Stripe) y
+// fija `profiles.premium_until` al fin de periodo más lejano de las suscripciones vivas del usuario.
 // La app considera Premium a quien tiene premium_until > now().
 //
 // Despliegue (ver docs/SETUP.md):
@@ -26,8 +27,9 @@ const supabase = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } },
 );
 
-// Estados de Stripe que dan acceso Premium.
-const ACTIVE_STATUSES = new Set(['active', 'trialing']);
+// Estados de Stripe que dan acceso Premium hasta el final del periodo pagado. past_due: ha fallado un
+// cobro y Stripe lo está reintentando; el usuario conserva Premium mientras actualiza su tarjeta.
+const ACTIVE_STATUSES = ['active', 'trialing', 'past_due'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 Deno.serve(async (req) => {
@@ -115,19 +117,17 @@ async function syncKnownSubscription(subscriptionId: string) {
 async function syncSubscription(userId: string, subscriptionId: string) {
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const now = new Date().toISOString();
-  const periodEnd = new Date(subscription.current_period_end * 1000).toISOString();
-  // Activa (aunque esté programada su cancelación): Premium hasta el final del periodo pagado.
-  // Cancelada, impagada o incompleta: Premium termina ya.
-  const premiumUntil = ACTIVE_STATUSES.has(subscription.status) ? periodEnd : now;
 
+  // Clave: el id de la suscripción. Si ya existía, se conserva el usuario al que se asoció al pagar.
   const { error: subscriptionError } = await supabase.from('subscriptions').upsert({
+    stripe_subscription_id: subscription.id,
     user_id: userId,
     stripe_customer_id: idOf(subscription.customer),
-    stripe_subscription_id: subscription.id,
     status: subscription.status,
-    current_period_end: periodEnd,
+    current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+    cancel_at_period_end: subscription.cancel_at_period_end,
     updated_at: now,
-  });
+  }, { onConflict: 'stripe_subscription_id' });
   if (subscriptionError?.code === '23503') {
     // El uid no existe en auth.users: reintentar no lo arreglará.
     console.warn(`Usuario ${userId} no existe: suscripción ${subscription.id} sin asociar.`);
@@ -135,13 +135,28 @@ async function syncSubscription(userId: string, subscriptionId: string) {
   }
   if (subscriptionError) throw subscriptionError;
 
+  await refreshPremium(userId, now);
+  console.log(`Usuario ${userId}: suscripción ${subscription.id} ${subscription.status}`);
+}
+
+// premium_until = el fin de periodo más lejano entre las suscripciones vivas del usuario (o ahora si no
+// le queda ninguna). Así una segunda suscripción, o una que otro pagó con su id, nunca le quita Premium.
+async function refreshPremium(userId: string, now: string) {
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('current_period_end')
+    .eq('user_id', userId)
+    .in('status', ACTIVE_STATUSES)
+    .order('current_period_end', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  const premiumUntil = data?.[0]?.current_period_end ?? now;
+
   const { error: profileError } = await supabase
     .from('profiles')
     .update({ premium_until: premiumUntil })
     .eq('id', userId);
   if (profileError) throw profileError;
-
-  console.log(`Usuario ${userId}: suscripción ${subscription.status}, premium_until=${premiumUntil}`);
 }
 
 // Stripe devuelve unas veces el id y otras el objeto expandido.

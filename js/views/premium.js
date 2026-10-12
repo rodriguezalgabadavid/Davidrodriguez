@@ -35,6 +35,15 @@ const dateFmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long'
 
 let editing = false; // "Editar respuestas" vuelve a enseñar el cuestionario
 let busy = false;
+let pollTimer = null; // espera a que el webhook de Stripe active Premium tras pagar
+
+const POLL_EVERY_MS = 3000;
+const POLL_FOR_MS = 90 * 1000;
+
+function stopPolling() {
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
 
 const price = () => `${escapeHtml(CONFIG.premiumPrice)}/${escapeHtml(CONFIG.premiumPeriod)}`;
 
@@ -51,6 +60,32 @@ function setBusy(button, label) {
 }
 
 // ---------- Paywall ----------
+
+// Vuelta de Stripe: el pago está hecho pero el webhook puede tardar unos segundos en activar Premium.
+function activating({ timedOut = false } = {}) {
+  return `
+    <button class="link back" data-route="entrenar">← Entrenar</button>
+    <section class="prem-hero" aria-live="polite">
+      <span class="prem-crown prem-crown-lg" aria-hidden="true">👑</span>
+      <h1>${timedOut ? 'Tu pago se está procesando' : 'Activando tu Premium…'}</h1>
+      <p class="prem-lead">${timedOut
+        ? 'Stripe aún no nos ha confirmado el pago. Suele tardar segundos; si en unos minutos no se activa, escríbenos y lo revisamos. No vuelvas a pagar.'
+        : 'Gracias por tu pago. Lo estamos confirmando con Stripe; tarda solo unos segundos.'}</p>
+      ${timedOut ? '<button class="btn primary big" data-action="check-again">Comprobar de nuevo</button>' : '<div class="loading"><span class="spinner" aria-hidden="true"></span></div>'}
+    </section>`;
+}
+
+// Ya hay una suscripción en Stripe (p. ej. con un cobro pendiente): se gestiona, no se paga otra.
+function existingSubscription() {
+  return `
+    <button class="link back" data-route="entrenar">← Entrenar</button>
+    <section class="prem-hero">
+      <span class="prem-crown prem-crown-lg" aria-hidden="true">👑</span>
+      <h1>Tu suscripción necesita atención</h1>
+      <p class="prem-lead">Ya tienes una suscripción Premium, pero no está activa ahora mismo. Revisa tu método de pago en el portal de Stripe.</p>
+      <button class="btn primary big" data-action="manage">Gestionar suscripción</button>
+    </section>`;
+}
 
 function paywall(ctx) {
   const demo = ctx.backend.mode === 'demo';
@@ -158,7 +193,11 @@ function subscriptionText(subscription) {
   if (subscription.simulated) {
     return `Premium de prueba (demo)${until ? ` hasta el ${until}` : ''}. No se cobra nada.`;
   }
-  return until ? `Premium activo · se renueva el ${until}.` : 'Premium activo.';
+  if (subscription.paymentIssue) {
+    return `Ha fallado el último cobro. Actualiza tu método de pago para no perder Premium${until ? ` (activo hasta el ${until})` : ''}.`;
+  }
+  if (!until) return 'Premium activo.';
+  return subscription.willRenew ? `Premium activo · se renueva el ${until}.` : `Premium activo hasta el ${until}. No se renovará.`;
 }
 
 function weekCard(plan, week, { completed, next, active, currentWeek, allDone }) {
@@ -254,8 +293,13 @@ export default {
   async render(ctx) {
     if (!ctx.me?.isPremium) {
       editing = false;
+      if (ctx.backend.checkoutPending?.()) return activating({ timedOut: ctx.cache.pollTimedOut });
+      const subscription = ctx.backend.mode === 'live' ? await ctx.backend.getSubscription().catch(() => null) : null;
+      if (subscription?.manageable) return existingSubscription();
       return paywall(ctx);
     }
+    stopPolling();
+    ctx.backend.clearCheckoutPending?.();
     const { backend } = ctx;
     const answers = await backend.getPremiumAnswers();
     if (!answers || editing) return questionnaire(ctx, answers);
@@ -270,11 +314,42 @@ export default {
     return planView(ctx, { plan, planState, subscription });
   },
 
+  mount(root, ctx) {
+    if (ctx.me?.isPremium || pollTimer || ctx.cache.pollTimedOut || !ctx.backend.checkoutPending?.()) return;
+    const startedAt = Date.now();
+    pollTimer = setInterval(async () => {
+      try {
+        const me = await ctx.refreshMe();
+        if (me?.isPremium) {
+          stopPolling();
+          ctx.backend.clearCheckoutPending?.();
+          toast('¡Ya eres Premium! 👑');
+          ctx.rerender();
+          return;
+        }
+      } catch {
+        // Sin conexión un momento: se reintenta en el siguiente intervalo.
+      }
+      if (Date.now() - startedAt > POLL_FOR_MS) {
+        stopPolling();
+        ctx.cache.pollTimedOut = true;
+        ctx.rerender();
+      }
+    }, POLL_EVERY_MS);
+  },
+
   unmount() {
     editing = false;
+    stopPolling();
   },
 
   actions: {
+    async 'check-again'(el, ctx) {
+      ctx.cache.pollTimedOut = false;
+      await ctx.refreshMe();
+      ctx.rerender();
+    },
+
     async checkout(el, ctx) {
       const { backend } = ctx;
       if (backend.mode === 'demo') {

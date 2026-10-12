@@ -72,13 +72,14 @@ PadelFit no usa contraseñas: el usuario escribe su email y recibe un enlace par
    - **Redirect URLs** → *Add URL*, añade:
      - `https://rodriguezalgabadavid.github.io/Davidrodriguez/**`
      - `http://localhost:8080/**` (para probar en tu ordenador con `npm start`)
-3. **Authentication → Emails → Templates** (opcional pero recomendable): traduce al español las plantillas **Magic Link** y **Confirm signup** (la primera vez que alguien entra recibe la de *Confirm signup*). Por ejemplo:
-   - Asunto: `Tu enlace para entrar en PadelFit`
+3. **Authentication → Emails → Templates** (**imprescindible**): edita las plantillas **Magic Link** y **Confirm signup** (la primera vez que alguien entra recibe la de *Confirm signup*) para que lleven, además del enlace, el **código de 6 cifras** `{{ .Token }}`. En iPhone, si la app está instalada en la pantalla de inicio, el enlace se abre en Safari y la sesión no llega a la app: el código es la forma de entrar. Por ejemplo:
+   - Asunto: `Tu acceso a PadelFit`
    - Cuerpo:
      ```html
      <h2>¡Hola!</h2>
      <p>Toca el botón para entrar en PadelFit:</p>
      <p><a href="{{ .ConfirmationURL }}">Entrar en PadelFit</a></p>
+     <p>¿Usas la app instalada en el móvil? Escribe este código: <strong>{{ .Token }}</strong></p>
      <p>Si no has pedido este correo, ignóralo.</p>
      ```
 4. **Correo propio (SMTP), imprescindible antes de abrirlo a gente**: el servicio de correo que trae Supabase es solo para pruebas (envía muy pocos correos por hora y puede limitarse a las direcciones de tu equipo). Configura un proveedor (Resend, Brevo, Postmark, Amazon SES...) en **Authentication → Emails → SMTP Settings** con un remitente de tu dominio, por ejemplo `hola@tudominio.com`.
@@ -212,7 +213,7 @@ No hace falta volver a desplegar la función (si dudas, repite el `deploy`: no p
 3. Stripe te devuelve a `.../#premium`. En unos segundos deberías ver Premium activo (si no, recarga).
 4. Comprueba que todo ha ido bien:
    - Stripe → tu webhook → **Event deliveries**: los eventos con respuesta **200**.
-   - Supabase → **Table Editor → subscriptions**: una fila con `status = active`.
+   - Supabase → **Table Editor → subscriptions**: una fila con `status = active` (una fila por suscripción de Stripe; si alguien pagara dos veces verías dos y Premium duraría hasta el final de la más larga).
    - Supabase → **Table Editor → profiles**: tu `premium_until` es dentro de un mes.
 5. Prueba la cancelación: desde la app (gestionar suscripción → portal de Stripe) cancela. Si cancelas "al final del periodo", sigues siendo Premium hasta esa fecha. Si cancelas la suscripción de inmediato desde el panel de Stripe, `premium_until` pasa a "ahora" y el Premium se acaba al momento.
 
@@ -235,11 +236,11 @@ Arreglo manual de un pago no asociado (en **SQL Editor**):
 select id from auth.users where email = 'persona@ejemplo.com';
 
 -- 2) Asocia la suscripción de Stripe (ids sub_... y cus_... del panel de Stripe)
-insert into public.subscriptions (user_id, stripe_customer_id, stripe_subscription_id, status)
-values ('<id del paso 1>', 'cus_...', 'sub_...', 'active')
-on conflict (user_id) do update
-  set stripe_customer_id = excluded.stripe_customer_id,
-      stripe_subscription_id = excluded.stripe_subscription_id;
+insert into public.subscriptions (stripe_subscription_id, user_id, stripe_customer_id, status)
+values ('sub_...', '<id del paso 1>', 'cus_...', 'active')
+on conflict (stripe_subscription_id) do update
+  set user_id = excluded.user_id,
+      stripe_customer_id = excluded.stripe_customer_id;
 ```
 
 Después, en Stripe, abre el último evento `invoice.paid` de esa suscripción y pulsa **Resend** (reenviar): el webhook actualizará `premium_until`.

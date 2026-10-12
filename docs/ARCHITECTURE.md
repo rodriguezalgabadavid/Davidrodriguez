@@ -126,7 +126,9 @@ Notification = { id, kind: 'kudos'|'comment'|'follow', actor: ProfileMin, activi
 
 PlanState = { planId: string|null, startedAt: ISO|null, completed: { [sessionKey]: ISO }, finished: { planId: string, finishedAt: ISO }[] }
 
-Subscription = { active: boolean, renewsAt: ISO|null, simulated: boolean }
+Subscription = { active: boolean, renewsAt: ISO|null, willRenew: boolean, paymentIssue: boolean, manageable: boolean, simulated: boolean }
+// willRenew: no se ha cancelado para final de periodo. paymentIssue: cobro fallido (past_due), Premium sigue hasta el fin de periodo.
+// manageable: tiene una suscripción viva en Stripe → se gestiona en el portal, nunca se ofrece pagar otra.
 ```
 
 ## Interfaz del backend
@@ -137,7 +139,8 @@ Todos los métodos son `async`. Los errores se lanzan como `Error` con un mensaj
 mode                                   // 'demo' | 'live'
 init()                                 // conecta/carga datos; idempotente
 getAuthState()                         // 'signed-out' | 'needs-profile' | 'ready'   (demo: nunca 'signed-out')
-signInWithEmail(email)                 // live: envía enlace mágico. demo: lanza Error
+signInWithEmail(email)                 // live: envía enlace mágico + código de 6 cifras. demo: lanza Error
+verifyEmailCode(email, code)           // live: entra con el código (app instalada en iPhone). demo: lanza Error
 createProfile({ name, level, position, club })   // crea el perfil del usuario actual → Profile
 getMe()                                // Profile | null
 updateMe(patch)                        // patch ⊆ { name, level, position, club, bio } → Profile
@@ -150,8 +153,8 @@ suggestedPlayers()                     // Profile[] (máx. 8, que aún no sigo)
 follow(userId) / unfollow(userId)
 getFollowing(userId) / getFollowers(userId)   // ProfileMin[]
 
-getFeed({ before?, limit = 20 })       // Activity[] mías + de quien sigo, por date desc, date < before
-getUserActivities(userId, { before?, limit = 20 })
+getFeed({ before?, beforeId?, limit = 20 })   // Activity[] mías + de quien sigo, por (date, id) desc, anteriores al cursor (before, beforeId) = fecha e id de la última actividad cargada
+getUserActivities(userId, { before?, beforeId?, limit = 20 })
 getActivity(id)                        // Activity | null
 getMyActivities()                      // Activity[] todas las mías (para estadísticas, retos y logros)
 getCircleActivities({ from, to })      // Activity[] mías + de quien sigo con from <= date < to (rankings)
@@ -179,6 +182,7 @@ abandonPlan()                          // → PlanState
 
 getSubscription()                      // Subscription
 startCheckout()                        // live: redirige a Stripe Payment Link. demo: activa Premium simulado 30 días
+checkoutPending() / clearCheckoutPending()   // live: ¿se volvió de pagar hace < 15 min? (esperar al webhook en vez de mostrar el paywall)
 manageSubscription()                   // live: abre el portal de cliente de Stripe. demo: cancela el simulado
 getPremiumAnswers() / savePremiumAnswers(answers)   // cuestionario del plan personalizado (privado)
 ```
@@ -189,12 +193,12 @@ Modo demo, interacciones simuladas: tras `createActivity`, 2-3 jugadores de ejem
 
 Tablas (`supabase/migrations/001_init.sql`), todas con RLS:
 
-- `profiles(id uuid pk → auth.users, name, avatar_url, level smallint 1-3, position 'drive'|'reves'|null, club, bio, premium_until timestamptz, active_plan_id text, active_plan_started_at timestamptz, created_at)`. Lectura: usuarios autenticados. Escritura: solo el propio perfil y **solo** las columnas `name, avatar_url, level, position, club, bio, active_plan_id, active_plan_started_at` (privilegios por columna). `premium_until` solo lo cambia el webhook (service role). `isPremium = premium_until > now()`.
-- `subscriptions(user_id pk, stripe_customer_id, stripe_subscription_id, status, current_period_end, updated_at)`. Lectura: el propio usuario. Escritura: solo service role.
+- `profiles(id uuid pk → auth.users, name, avatar_url, level smallint 1-3, position 'drive'|'reves'|null, club, bio, premium_until timestamptz, active_plan_id text, active_plan_started_at timestamptz, created_at)`. Lectura: usuarios autenticados. Escritura: solo el propio perfil y **solo** las columnas `name, level, position, club, bio, active_plan_id, active_plan_started_at` (privilegios por columna; `avatar_url` no, hasta que haya subida de avatar). Empezar el plan `premium` exige Premium (trigger). `premium_until` solo lo cambia el webhook (service role). `isPremium = premium_until > now()`.
+- `subscriptions(stripe_subscription_id pk, user_id, stripe_customer_id, status, current_period_end, cancel_at_period_end, updated_at)`: una fila por suscripción de Stripe. Lectura: el propio usuario. Escritura: solo service role. `premium_until` = fin de periodo más lejano de sus suscripciones `active`/`trialing`/`past_due`.
 - `activities(id uuid, user_id, type, played_at, duration_seconds, rpe, won, sets jsonb, match_kind, partner, rivals text[], club, title, body, photo_path, plan_id, plan_session, focus, created_at)`. Lectura: autenticados. Insertar y borrar: el dueño.
 - `kudos(activity_id, user_id, created_at, pk(activity_id, user_id))`, `comments(id, activity_id, user_id, body 1-500, created_at)`, `follows(follower_id, following_id, created_at, pk, follower≠following)`.
 - `notifications(id, user_id destinatario, actor_id, kind, activity_id, preview, read, created_at)`. Las crean triggers `security definer` al insertar kudos, comments o follows (nunca para uno mismo). El destinatario solo puede leerlas y marcar `read`.
-- `challenge_participants(user_id, challenge_id, joined_at)`, `plan_progress(user_id, plan_id, session_key, completed_at)`, `plan_finishes(user_id, plan_id, finished_at)`, `premium_answers(user_id pk, answers jsonb, updated_at)`: solo el propio usuario.
+- `challenge_participants(user_id, challenge_id, joined_at)`, `plan_progress(user_id, plan_id, session_key, completed_at)`, `plan_finishes(user_id, plan_id, finished_at)`, `premium_answers(user_id pk, answers jsonb, updated_at)`: solo el propio usuario. Guardar respuestas del cuestionario y progreso del plan `premium` exige Premium (`is_premium()` en RLS).
 - Storage: bucket público `photos`. Solo se sube o borra dentro de la carpeta `<uid>/`.
 
 Mapeo de columnas a modelo: `played_at→date`, `duration_seconds→seconds`, `body→text`, `photo_path→photoUrl` (URL pública), `match_kind→matchKind`, `plan_id/plan_session→plan`.

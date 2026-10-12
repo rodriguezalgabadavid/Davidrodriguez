@@ -450,3 +450,8 @@
   .post-type > span:active,
   .post-result > span:active { transform: none; }
 }
+
+/* Código de 6 cifras del correo (app instalada en iPhone) */
+.onb-code { display: flex; flex-direction: column; gap: 0.4rem; width: 100%; margin-top: 0.5rem; text-align: left; }
+.onb-code-row { display: flex; gap: 0.5rem; }
+.onb-code-row .input { flex: 1; min-width: 0; font-size: 1.15rem; letter-spacing: 0.3em; text-align: center; font-variant-numeric: tabular-nums; }
