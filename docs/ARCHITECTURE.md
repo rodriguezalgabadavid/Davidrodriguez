@@ -177,7 +177,7 @@ joinChallenge(instanceId) / leaveChallenge(instanceId)
 
 getPlanState()                         // PlanState
 startPlan(planId)                      // → PlanState (reinicia el progreso de ese plan)
-completePlanSession(sessionKey, totalSessions)   // → PlanState; si se completan todas, pasa a finished y planId = null
+completePlanSession(sessionKey, sessionKeys)     // → PlanState; sessionKeys = claves de las sesiones del plan actual; si están todas hechas, pasa a finished y planId = null
 abandonPlan()                          // → PlanState
 
 getSubscription()                      // Subscription

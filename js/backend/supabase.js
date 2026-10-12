@@ -796,7 +796,8 @@ export class SupabaseBackend {
     return this.getPlanState();
   }
 
-  async completePlanSession(sessionKey, totalSessions) {
+  // sessionKeys: las sesiones del plan actual. Solo cuentan esas (no las de una versión anterior del plan).
+  async completePlanSession(sessionKey, sessionKeys = []) {
     const { sb, uid } = await this._auth();
     const row = await this._ownRow({ fresh: true });
     const planId = row?.active_plan_id;
@@ -810,8 +811,9 @@ export class SupabaseBackend {
         ),
       MSG.plan,
     );
-    const done = (await this._planProgress(uid, planId, iso(row.active_plan_started_at))).length;
-    if (totalSessions > 0 && done >= totalSessions) {
+    const done = new Set((await this._planProgress(uid, planId, iso(row.active_plan_started_at))).map((r) => r.session_key));
+    const keys = Array.isArray(sessionKeys) ? sessionKeys.map(String) : [];
+    if (keys.length && keys.every((k) => done.has(k))) {
       const { error } = await sb.from('plan_finishes').insert({ user_id: uid, plan_id: planId, finished_at: nowIso() });
       if (error && !isDuplicate(error)) this._fail(error, MSG.plan);
       await this._updateOwn({ active_plan_id: null, active_plan_started_at: null }, MSG.plan);

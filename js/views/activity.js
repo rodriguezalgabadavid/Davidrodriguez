@@ -212,6 +212,7 @@ export default {
           await ctx.backend.deleteComment(commentId);
           el.closest('.cm-item')?.remove();
           syncCommentCount(id);
+          ctx.refreshBadge(); // su notificación también se ha borrado
           toast('Comentario borrado');
         } catch (error) {
           toast(error.message || 'No se ha podido borrar el comentario.');
@@ -225,8 +226,9 @@ export default {
       askConfirm('¿Borrar esta actividad? Se perderán sus ¡Vamos! y comentarios.', 'Borrar', async () => {
         try {
           await ctx.backend.deleteActivity(id);
+          ctx.refreshBadge(); // se han borrado también sus notificaciones
           toast('Actividad borrada');
-          ctx.navigate('inicio');
+          ctx.navigate('inicio', {}, { replace: true });
         } catch (error) {
           toast(error.message || 'No se ha podido borrar la actividad.');
         }

@@ -451,7 +451,7 @@ export default {
         const next = nextPlanSession(plan, state);
         if (!next) return;
         // Sin `equipment`: la sesión Premium usa el material de tus respuestas.
-        await playSession(ctx, sessionForPlan(next), { planSession: next, total: planSessions(plan).length, returnTo: 'premium' });
+        await playSession(ctx, sessionForPlan(next), { planSession: next, sessionKeys: planSessions(plan).map((s) => s.key), returnTo: 'premium' });
       };
       if (planState.planId && planState.planId !== 'premium') {
         const current = getPlan(planState.planId)?.name ?? 'otro plan';

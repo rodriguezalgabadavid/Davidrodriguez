@@ -1,61 +1,54 @@
 # PadelFit 🎾
 
-Tu pádel en un solo sitio, al estilo Strava: **registra tus partidos, sigue tus estadísticas y entrena la preparación física específica para pádel**. Es una app web (PWA) sin dependencias: se instala en el móvil, funciona sin conexión y tus datos se guardan en tu dispositivo.
+**La red social del pádel**, al estilo Strava: comparte tus partidos y entrenos con foto, recibe "¡Vamos!" y comentarios de tus amigos, completa retos y logros, y prepárate físicamente con planes específicos para pádel. Los planes generales son gratis; el **plan personalizado Premium** cuesta 19,99 €/mes.
 
-## Funcionalidades
+App web (PWA) sin paso de compilación ni dependencias: HTML, módulos ES y CSS. Se instala en el móvil desde el navegador.
 
-### Muro de actividad
-- Partidos, clases técnicas y sesiones de físico en un mismo muro, con resultado, tiempo, esfuerzo y carga.
-- Resumen semanal: actividades, horas, carga, partidos ganados/perdidos, comparación con la semana anterior y objetivo semanal.
-- Gráfico de minutos por día y tipo de actividad.
+## Qué tiene
 
-### Registro de partidos
-- Marcador por sets (incluye súper tie-break), tipo (amistoso, liga, torneo, americana), posición (drive/revés), compañero, rivales y club, con autocompletado de nombres ya usados.
-- Esfuerzo percibido (escala de Borg CR-10) y sensaciones.
-- Editar y eliminar actividades.
+- **Muro social**: tus actividades y las de la gente que sigues, con resultado, foto, texto, "¡Vamos!" y comentarios. Sugerencias de jugadores a los que seguir.
+- **Publicar en segundos**: partido, entreno o clase → ¿victoria o derrota? → foto y texto opcionales. Marcador por sets, compañero, rivales, club, duración y esfuerzo dentro de "Más detalles".
+- **El enganche**: racha de semanas seguidas, retos semanales y mensuales con ranking entre amigos, logros, notificaciones y una celebración al publicar con lo que has desbloqueado.
+- **Entrenar**: planes generales gratuitos (primeros pasos, pretemporada, piernas explosivas, hombro sano, tercer set), sesiones rápidas y una biblioteca de más de 50 ejercicios, con temporizador guiado.
+- **Premium (19,99 €/mes)**: un cuestionario (objetivo, días, minutos, nivel, molestias, material y partidos por semana) genera un plan de 4 semanas que se adapta a tus molestias y a tu carga de partidos. Pago y gestión con Stripe.
+- **Perfil**: estadísticas (racha, partidos ganados y perdidos, horas), logros, compañeros y actividades. Ajustes de perfil, preferencias y suscripción.
 
-### Estadísticas
-- Porcentaje de victorias, racha actual y mejor racha, últimos 5 resultados, sets y juegos a favor/en contra, balance por posición.
-- Balance con cada compañero y contra cada rival.
-- **Carga de entrenamiento** (minutos × esfuerzo, método sRPE) de las últimas 8 semanas y ratio carga aguda/crónica con aviso de sobrecarga.
-- Logros: remontada, rosco, rachas, torneos, sesiones de físico…
+## Modo demo y modo real
 
-### Preparación física
-- Generador de sesiones por objetivo (agilidad, potencia, core, prevención, resistencia…), nivel, duración y material disponible.
-- Temporizador guiado a pantalla completa con avisos sonoros, vibración y "cambia de lado".
-- Biblioteca de más de 50 ejercicios explicados con su aplicación en pista.
-
-### Tus datos
-- Copia de seguridad descargable y restaurable (JSON), para no perder el historial o pasarlo a otro móvil.
-- Datos de ejemplo para probar la app vacía.
+- **Demo** (por defecto, sin configurar nada): todo se guarda en el dispositivo, con una comunidad de jugadores **de ejemplo** que reaccionan a lo que publicas y un pago Premium **simulado** (no se cobra nada). Todo lo de ejemplo se marca como tal en la app.
+- **Real**: cuentas con enlace mágico o código por email, base de datos y fotos en **Supabase**, y cobro con **Stripe**. Paso a paso en [docs/SETUP.md](docs/SETUP.md).
 
 ## Uso
 
 ```bash
 npm start        # sirve la app en http://localhost:8080
-npm test         # tests unitarios (node:test, sin dependencias)
+npm test         # tests de la lógica y del backend demo (node:test, sin dependencias)
 ```
 
-Abrir `index.html` directamente con `file://` no funciona (módulos ES y service worker necesitan un servidor).
+Hace falta un servidor: abrir `index.html` con doble clic (`file://`) no funciona.
 
-### Publicación en GitHub Pages
-El workflow `.github/workflows/pages.yml` ejecuta los tests y publica la app en cada push a la rama principal. Para activarlo una única vez: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+**GitHub Pages**: el workflow `.github/workflows/pages.yml` pasa los tests y publica la app en cada push a la rama principal. Para activarlo una vez: *Settings → Pages → Build and deployment → Source: GitHub Actions*. Hasta entonces el paso de publicar se salta con un aviso.
 
 ## Estructura
 
 ```
-index.html            Shell de la app
-css/styles.css        Estilos (modo claro/oscuro, mobile first)
-js/app.js             Estado, persistencia (localStorage), navegación y eventos
-js/views.js           Vistas: muro, registro, detalle, progreso, entrenar, ejercicios
-js/activities.js      Modelo de actividades y partidos (marcador, carga, normalización)
-js/stats.js           Estadísticas, carga semanal, ratio agudo/crónico y logros
-js/generator.js       Generador de sesiones físicas y línea de tiempo del temporizador
-js/player.js          Temporizador de intervalos a pantalla completa
-js/data.js            Ejercicios, categorías, niveles y objetivos
-js/ui.js              Utilidades de interfaz (formato, diálogos, avisos)
-sw.js                 Service worker para uso sin conexión
-tests/                Tests de lógica
+index.html                 Shell de la app (cabecera, barra inferior, temporizador)
+js/app.js                  Router por hash con historial, delegación de eventos y contexto de las vistas
+js/views/                  Una vista por pantalla (muro, actividad, publicar, retos, entrenar, premium, perfil…)
+js/components.js           Tarjeta de actividad y acciones globales (¡Vamos!, seguir…)
+js/backend/local.js        Backend demo (localStorage + comunidad de ejemplo en demo-data.js)
+js/backend/supabase.js     Backend real (Supabase + Stripe Payment Links)
+js/activities.js           Modelo de actividad, marcador, saneado de datos
+js/stats.js                Rachas, resúmenes, carga de entrenamiento y logros
+js/challenges.js           Retos semanales y mensuales y rankings
+js/plans.js                Planes generales y plan personalizado Premium
+js/generator.js, data.js   Generador de sesiones de físico y biblioteca de ejercicios
+js/player.js               Temporizador de intervalos a pantalla completa
+supabase/migrations/       Esquema SQL con RLS, triggers de notificaciones y Storage
+supabase/functions/        Webhook de Stripe (Edge Function)
+docs/ARCHITECTURE.md       Contratos entre módulos: vistas, backend, modelos y esquema
+docs/SETUP.md              Cómo poner en marcha Supabase, Stripe y GitHub Pages
+tests/                     Tests (node --test)
 ```
 
-> Esta app no sustituye el consejo de un preparador físico o fisioterapeuta. Si tienes una lesión, consulta antes de entrenar.
+> PadelFit no sustituye el consejo de un preparador físico o fisioterapeuta. Si tienes una lesión, consulta antes de entrenar.

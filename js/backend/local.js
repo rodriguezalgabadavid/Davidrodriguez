@@ -351,6 +351,8 @@ export class LocalBackend {
     await this._ready();
     try {
       this._storage?.removeItem(STORAGE_KEY);
+      // "Empezar de cero" de verdad: el historial de versiones anteriores ya se importó una vez.
+      for (const key of LEGACY_KEYS) this._storage?.removeItem(key);
     } catch (error) {
       console.warn('[demo] No se ha podido borrar el almacenamiento local.', error);
     }
@@ -891,13 +893,14 @@ export class LocalBackend {
     return clone(this._state.plan);
   }
 
-  async completePlanSession(sessionKey, totalSessions) {
+  // sessionKeys: las sesiones del plan actual. Solo cuentan esas (no las de una versión anterior del plan).
+  async completePlanSession(sessionKey, sessionKeys = []) {
     await this._requireMe();
     const plan = this._state.plan;
     if (!plan.planId) throw new Error('Empieza un plan para ir marcando sesiones.');
     plan.completed[String(sessionKey)] = nowIso();
-    const total = Number(totalSessions) || 0;
-    if (total > 0 && Object.keys(plan.completed).length >= total) {
+    const keys = Array.isArray(sessionKeys) ? sessionKeys.map(String) : [];
+    if (keys.length && keys.every((k) => plan.completed[k])) {
       plan.finished.push({ planId: plan.planId, finishedAt: nowIso() });
       plan.planId = null;
       plan.startedAt = null;

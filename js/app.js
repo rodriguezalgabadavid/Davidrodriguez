@@ -95,12 +95,20 @@ function closeOverlays() {
   document.querySelectorAll('.sheet-backdrop').forEach((el) => el.remove());
 }
 
-export function navigate(route, params = {}) {
+// Cada entrada del historial guarda su ruta y sus parámetros: "Volver" restaura exactamente la pantalla
+// anterior (p. ej. de un perfil a otro perfil). replace: true sustituye la entrada actual (tras publicar,
+// para que "Volver" no lleve a un formulario vacío).
+export function navigate(route, params = {}, { replace = false } = {}) {
   app.paramsByRoute[route] = params;
   closeOverlays();
-  if (location.hash === `#${route}`) render({ scrollTop: true });
-  else location.hash = route; // hashchange → render
+  const state = { route, params };
+  if (replace) history.replaceState(state, '', `#${route}`);
+  else history.pushState(state, '', `#${route}`);
+  render({ scrollTop: true });
 }
+
+const sameParams = (a = {}, b = {}) =>
+  JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
 
 function back() {
   if (history.length > 1) history.back();
@@ -189,7 +197,15 @@ document.addEventListener('click', (event) => {
   if (el.disabled) return;
   if (el.dataset.route) {
     event.preventDefault();
-    return navigate(el.dataset.route, paramsFrom(el));
+    const route = el.dataset.route;
+    const params = paramsFrom(el);
+    if (route === app.current?.route && sameParams(params, app.paramsByRoute[route])) {
+      // Volver a tocar la pantalla actual: sube arriba como en cualquier app social; si ya estás arriba,
+      // la refresca. Nunca en publicar: se perdería lo que estás escribiendo.
+      if (window.scrollY > 0 || route === 'publicar') return window.scrollTo({ top: 0, behavior: 'smooth' });
+      return render();
+    }
+    return navigate(route, params);
   }
   if (el.tagName === 'A' && !el.getAttribute('href')?.startsWith('http')) event.preventDefault();
   runAction(el.dataset.action, el, event);
@@ -212,7 +228,17 @@ document.addEventListener('change', (event) => {
   if (el) runAction(el.dataset.change, el, event);
 });
 
+// Atrás/adelante: restaura los parámetros guardados en esa entrada del historial.
+window.addEventListener('popstate', (event) => {
+  closeOverlays();
+  if (event.state?.route) app.paramsByRoute[event.state.route] = event.state.params ?? {};
+  render();
+});
+
+// Hash escrito a mano (o navegadores que no emiten popstate al cambiarlo): solo si la ruta cambió,
+// para no renderizar dos veces cuando popstate ya lo hizo.
 window.addEventListener('hashchange', () => {
+  if (currentRoute() === app.current?.route) return;
   closeOverlays();
   render();
 });
@@ -243,17 +269,28 @@ async function start() {
     const wasReady = app.authState === 'ready';
     app.authState = state;
     app.me = state === 'ready' ? await app.backend.getMe() : null;
+    // Otra cuenta (o demo reiniciada): nada de la sesión anterior debe quedar en pantalla.
+    if (state !== 'ready' || !wasReady) {
+      app.caches = {};
+      app.paramsByRoute = {};
+    }
     if (state === 'ready' && !wasReady) navigate(DEFAULT_ROUTE);
     else render();
     refreshBadge();
   });
 
+  // Llegan "¡Vamos!", comentarios o seguidores: se ven al momento en la pantalla abierta.
+  // Si estás escribiendo (p. ej. un comentario) no se repinta, para no quitarte el foco.
   app.backend.subscribe((event) => {
     refreshBadge();
-    if (event.type === 'notification' && app.current?.route === 'notificaciones') render();
-    if (event.type === 'feed' && ['inicio', 'actividad'].includes(app.current?.route)) render();
+    const route = app.current?.route;
+    const typing = $view.contains(document.activeElement) && document.activeElement.matches('input, textarea');
+    if (route === 'notificaciones' && event.type === 'notification') render();
+    else if (['inicio', 'actividad'].includes(route) && !typing) render();
   });
 
+  // La primera entrada del historial también lleva su ruta, para que "Volver" funcione desde aquí.
+  history.replaceState({ route: currentRoute(), params: app.paramsByRoute[currentRoute()] ?? {} }, '', location.hash || `#${DEFAULT_ROUTE}`);
   await render();
   refreshBadge();
 }

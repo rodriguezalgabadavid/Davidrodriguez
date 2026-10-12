@@ -165,7 +165,7 @@ const POSTS = [
   { by: 'lucia', d: 13, h: 19, type: 'clase', title: 'Clase: víbora y salida de pared', min: 60, rpe: 5,
     text: 'Por fin la víbora sale con efecto 🙌' },
   { by: 'lucia', d: 20, h: 20, type: 'partido', matchKind: 'amistoso', min: 80, rpe: 6, partner: 'Javi', rivals: ['Carlos', 'Pablo'],
-    sets: [[6, 2], [6, 3]], photo: 'racket', text: 'Pachanga de jueves. Buen ritmo y mejores risas.' },
+    sets: [[6, 2], [6, 3]], photo: 'racket', text: 'Pachanga entre semana. Buen ritmo y mejores risas.' },
 
   // Javi
   { by: 'javi', ago: 3, type: 'partido', matchKind: 'amistoso', min: 90, rpe: 8, partner: 'Pablo', rivals: ['Carlos', 'Nuria'],
@@ -176,7 +176,7 @@ const POSTS = [
   { by: 'javi', d: 6, h: 21, type: 'partido', matchKind: 'liga', min: 75, rpe: 7, partner: 'Lucía', rivals: ['Marta', 'Ana'],
     sets: [[2, 6], [3, 6]], text: 'Nos pasaron por encima. Toca entrenar la defensa del globo.' },
   { by: 'javi', d: 15, h: 18, type: 'partido', matchKind: 'americana', min: 120, rpe: 7, won: true, sets: [], photo: 'evening',
-    text: 'Americana del sábado: 3 de 4 partidos ganados. Premio: una lata de bolas 🎾',
+    text: 'Americana del finde: 3 de 4 partidos ganados. Premio: una lata de bolas 🎾',
     comments: [['marta', '¿Una lata de bolas? ¡Menudo premio! 😂']] },
 
   // Marta
@@ -222,7 +222,7 @@ const POSTS = [
     text: 'Salida de doble pared: ya me sale una de cada tres 😂',
     comments: [['carlos', 'Una de tres ya es más que yo 😂']] },
   { by: 'pablo', d: 14, h: 18, type: 'partido', matchKind: 'americana', min: 120, rpe: 6, won: false, sets: [],
-    text: 'Americana del sábado. Gané uno de cuatro, pero risas aseguradas.' },
+    text: 'Americana con los del club. Gané uno de cuatro, pero risas aseguradas.' },
   { by: 'pablo', d: 17, h: 8, type: 'entreno', focus: 'agilidad', title: 'Agilidad', min: 30, rpe: 6, text: '' },
 
   // Nuria

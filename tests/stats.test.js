@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ACHIEVEMENTS, achievements, bestWeeklyStreak, computeStats, computeStreak, loadRatio, matchStats, newlyUnlocked,
+  ACHIEVEMENTS, achievements, bestWeeklyStreak, computeStats, computeStreak, loadRatio, matchStats, newlyUnlocked, startOfWeek,
   weekActivity, weekSummary, weeklyLoad, weeklyStreak,
 } from '../js/stats.js';
 
@@ -232,4 +232,17 @@ test('newlyUnlocked devuelve solo lo recién desbloqueado', () => {
   assert.deepEqual(newlyUnlocked(after, after), []);
   assert.deepEqual(newlyUnlocked([], after).map((a) => a.id).sort(), ['primer-partido', 'primera-foto', 'primera-victoria']);
   assert.deepEqual(newlyUnlocked(undefined, achievements([])), []);
+});
+
+test('startOfWeek es el lunes a medianoche aunque el cambio de hora salte la medianoche', () => {
+  const tz = process.env.TZ;
+  process.env.TZ = 'America/Santiago'; // el 6/9/2026 a las 00:00 se pasa a las 01:00
+  try {
+    const monday = startOfWeek(new Date(2026, 8, 6, 12));
+    assert.equal(monday.getDay(), 1);
+    assert.equal(monday.getHours(), 0);
+    assert.equal(monday.getDate(), 31);
+  } finally {
+    process.env.TZ = tz;
+  }
 });

@@ -520,7 +520,8 @@ export default {
       } finally {
         busy = false;
       }
-      if (mounted) ctx.navigate('actividad', { id: activity.id });
+      // replace: "Volver" desde la actividad recién publicada lleva a donde estabas, no al formulario vacío.
+      if (mounted) ctx.navigate('actividad', { id: activity.id }, { replace: true });
     },
   },
 };

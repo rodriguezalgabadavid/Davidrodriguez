@@ -44,10 +44,10 @@ export function getChallenge(id) {
 
 const pad = (n) => String(n).padStart(2, '0');
 
+// Por fecha de calendario (no setHours(0)): así también es medianoche los días de cambio de hora.
 function startOfDay(date) {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 // Semana ISO: la semana 1 es la que contiene el 4 de enero; el año es el del jueves de esa semana.
@@ -123,7 +123,8 @@ export function metricValue(metric, activities) {
       return activities.filter((a) => a.type === 'entreno').length;
     case 'hours': {
       const seconds = activities.filter((a) => a.type !== 'entreno').reduce((s, a) => s + (Number(a.seconds) || 0), 0);
-      return Math.round((seconds / 3600) * 10) / 10;
+      // Hacia abajo: con redondeo, 11 h 57 min ya mostraría 12 y daría el reto por cumplido.
+      return Math.floor(seconds / 360) / 10;
     }
     case 'photos':
       return activities.filter((a) => Boolean(a.photoUrl)).length;

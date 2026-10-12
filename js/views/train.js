@@ -69,7 +69,9 @@ export function confirmThen(message, label, fn) {
 
 // Abre el temporizador. Al guardar: publica el entreno en el muro, marca la sesión del plan (si la hay),
 // celebra lo conseguido y vuelve a `returnTo` para ver el progreso actualizado.
-export async function playSession(ctx, session, { planSession = null, total = 0, returnTo = 'entrenar' } = {}) {
+// sessionKeys: claves de las sesiones del plan tal como es ahora (si el plan personalizado cambia, las
+// sesiones completadas que ya no existen no cuentan para terminarlo).
+export async function playSession(ctx, session, { planSession = null, sessionKeys = [], returnTo = 'entrenar' } = {}) {
   if (starting) return;
   starting = true;
   let before = null;
@@ -103,7 +105,7 @@ export async function playSession(ctx, session, { planSession = null, total = 0,
 
     if (planSession) {
       try {
-        await ctx.backend.completePlanSession(planSession.key, total);
+        await ctx.backend.completePlanSession(planSession.key, sessionKeys);
       } catch (error) {
         console.error(error);
         toast(error.message || 'Tu entreno está publicado, pero no se ha podido marcar en el plan.');
@@ -366,7 +368,7 @@ export default {
       if (!next) return;
       // Los planes gratuitos son sin material; el Premium usa el material de tus respuestas.
       const session = sessionForPlan(next, plan.id === 'premium' ? {} : { equipment: [] });
-      await playSession(ctx, session, { planSession: next, total: planSessions(plan).length, returnTo: 'entrenar' });
+      await playSession(ctx, session, { planSession: next, sessionKeys: planSessions(plan).map((s) => s.key), returnTo: 'entrenar' });
     },
 
     'leave-plan'(el, ctx) {

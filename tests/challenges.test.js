@@ -166,3 +166,12 @@ test('retos completados entre los que me apunté', () => {
   assert.deepEqual(completedChallenges(joined, mine), ['partidos-mes:2026-09', 'activo-semana:2026-W42']);
   assert.deepEqual(completedChallenges([], mine), []);
 });
+
+test('el reto de horas no se da por cumplido por redondeo (11 h 57 min no son 12 h)', () => {
+  const horas = getChallenge('horas-mes');
+  const almost = [...Array(7)].map((_, i) => act('me', 'Yo', at(2026, 10, 1 + i), { seconds: 90 * 60 }))
+    .concat(act('me', 'Yo', at(2026, 10, 9), { seconds: 87 * 60 }));
+  const p = challengeProgress(horas, almost, now);
+  assert.equal(p.value, 11.9);
+  assert.equal(p.done, false);
+});

@@ -10,12 +10,12 @@ export function dayKey(date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// Lunes a las 00:00 (hora local). Se construye por fecha de calendario: en los países donde el cambio de
+// hora salta la medianoche (Chile, Paraguay, Cuba…), setHours(0) en ese domingo daría las 01:00.
 export function startOfWeek(date) {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
   const offset = (d.getDay() + 6) % 7; // lunes = 0
-  d.setDate(d.getDate() - offset);
-  return d;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - offset);
 }
 
 export function addDays(date, days) {
