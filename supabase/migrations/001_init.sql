@@ -481,9 +481,13 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values ('photos', 'photos', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
 on conflict (id) do nothing;
 
+-- Lectura: al ser un bucket público, cualquiera ve una foto con su URL pública (getPublicUrl) sin
+-- pasar por esta política. La política solo permite listar/consultar objetos por la API (lo que
+-- además necesitan remove y upsert) y se limita a usuarios con sesión para no exponer el listado.
 drop policy if exists photos_public_read on storage.objects;
-create policy photos_public_read on storage.objects
-  for select to public using (bucket_id = 'photos');
+drop policy if exists photos_read on storage.objects;
+create policy photos_read on storage.objects
+  for select to authenticated using (bucket_id = 'photos');
 
 drop policy if exists photos_insert_own on storage.objects;
 create policy photos_insert_own on storage.objects

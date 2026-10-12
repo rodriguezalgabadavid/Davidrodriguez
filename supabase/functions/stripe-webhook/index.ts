@@ -81,8 +81,11 @@ async function handleEvent(event: Stripe.Event) {
 
     // Cobro mensual correcto: alarga premium_until hasta el nuevo fin de periodo.
     case 'invoice.paid': {
-      const invoice = event.data.object as Stripe.Invoice;
-      const subscriptionId = idOf(invoice.subscription);
+      const invoice = event.data.object as Stripe.Invoice & {
+        parent?: { subscription_details?: { subscription?: string | { id: string } | null } | null } | null;
+      };
+      // Versiones antiguas de la API: invoice.subscription. Desde 2025: invoice.parent.subscription_details.
+      const subscriptionId = idOf(invoice.subscription) ?? idOf(invoice.parent?.subscription_details?.subscription);
       if (subscriptionId) await syncKnownSubscription(subscriptionId);
       return;
     }
@@ -125,6 +128,11 @@ async function syncSubscription(userId: string, subscriptionId: string) {
     current_period_end: periodEnd,
     updated_at: now,
   });
+  if (subscriptionError?.code === '23503') {
+    // El uid no existe en auth.users: reintentar no lo arreglará.
+    console.warn(`Usuario ${userId} no existe: suscripción ${subscription.id} sin asociar.`);
+    return;
+  }
   if (subscriptionError) throw subscriptionError;
 
   const { error: profileError } = await supabase
