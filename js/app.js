@@ -1,334 +1,264 @@
-import { generateSession } from './generator.js';
-import { ACTIVITY_TYPES, demoActivities, migrateLegacyHistory, normalizeActivity, parseSets } from './activities.js';
+import { createBackend } from './backend/index.js';
+import { globalActions } from './components.js';
 import { startPlayer } from './player.js';
-import { askConfirm, toast } from './ui.js';
-import {
-  rpeLabel, viewActividad, viewEjercicios, viewEntrenar, viewInicio, viewProgreso, viewRegistrar,
-} from './views.js';
+import { escapeHtml, loading, toast } from './ui.js';
 
-// ---------- Persistencia ----------
+import feed from './views/feed.js';
+import activity from './views/activity.js';
+import notifications from './views/notifications.js';
+import search from './views/search.js';
+import publish from './views/publish.js';
+import onboarding from './views/onboarding.js';
+import challenges from './views/challenges.js';
+import profile from './views/profile.js';
+import settingsView from './views/settings.js';
+import train from './views/train.js';
+import exercises from './views/exercises.js';
+import premium from './views/premium.js';
 
-const STORAGE = {
-  settings: 'padelfit:settings',
-  activities: 'padelfit:activities',
-  legacyHistory: 'padelfit:history',
-};
+// ---------- Rutas ----------
 
-function read(key) {
+const VIEWS = Object.fromEntries(
+  [feed, activity, notifications, search, publish, onboarding, challenges, profile, settingsView, train, exercises, premium]
+    .map((v) => [v.route, v]),
+);
+const REQUIRED_PARAMS = { actividad: ['id'] };
+const DEFAULT_ROUTE = 'inicio';
+const ONBOARDING_ROUTE = 'bienvenida';
+
+// ---------- Preferencias locales ----------
+
+const SETTINGS_KEY = 'padelfit:settings';
+
+function loadSettings() {
   try {
-    return JSON.parse(localStorage.getItem(key));
+    const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY)) ?? {};
+    return { sound: stored.sound ?? true, weeklyGoal: stored.weeklyGoal ?? 3 };
   } catch {
-    return null;
+    return { sound: true, weeklyGoal: 3 };
   }
 }
 
-function write(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Sin almacenamiento (modo privado): la app sigue funcionando en memoria.
-  }
-}
-
-function loadActivities() {
-  const stored = read(STORAGE.activities);
-  if (Array.isArray(stored)) return stored;
-  const legacy = read(STORAGE.legacyHistory);
-  return Array.isArray(legacy) ? migrateLegacyHistory(legacy) : [];
-}
-
-const state = {
-  settings: {
-    name: '',
-    position: 'reves',
-    focus: 'completa',
-    level: 2,
-    minutes: 30,
-    equipment: [],
-    weeklyGoal: 4,
-    sound: true,
-    ...(read(STORAGE.settings) ?? {}),
-  },
-  activities: loadActivities(),
-  session: null,
-  library: { category: 'all', query: '' },
-  detailId: null,
-  editId: null,
-  draftType: null,
-};
-
-const saveSettings = () => write(STORAGE.settings, state.settings);
-const saveActivities = () => write(STORAGE.activities, state.activities);
-saveActivities();
-
-// ---------- Navegación ----------
+// ---------- Estado de la app ----------
 
 const $view = document.getElementById('view');
+const $tabbar = document.querySelector('.tabbar');
+const $topbar = document.querySelector('.topbar');
+const $notifCount = document.getElementById('notif-count');
 
-const VIEWS = {
-  inicio: viewInicio,
-  entrenar: viewEntrenar,
-  registrar: viewRegistrar,
-  progreso: viewProgreso,
-  ejercicios: viewEjercicios,
-  actividad: viewActividad,
+const app = {
+  backend: null,
+  me: null,
+  authState: 'signed-out',
+  settings: loadSettings(),
+  paramsByRoute: {},
+  current: null, // { route, view }
+  renderToken: 0,
+  caches: {},
 };
 
-function currentRoute() {
-  const route = location.hash.replace('#', '');
-  if (route === 'actividad' && !state.detailId) return 'inicio';
-  return VIEWS[route] ? route : 'inicio';
-}
-
-function render() {
-  const route = currentRoute();
-  $view.innerHTML = VIEWS[route]({ state, now: new Date() });
-  const tab = route === 'actividad' ? 'inicio' : route;
-  document.querySelectorAll('.tabbar [data-route]').forEach((b) => b.classList.toggle('on', b.dataset.route === tab));
-}
-
-function navigate(route) {
-  if (route !== 'registrar') state.editId = null;
-  if (location.hash === `#${route}`) render();
-  else location.hash = route;
-  window.scrollTo(0, 0);
-}
-
-window.addEventListener('hashchange', () => {
-  if (location.hash !== '#registrar') state.editId = null;
-  render();
-});
-
-// ---------- Acciones ----------
-
-function addActivity(input) {
-  const activity = normalizeActivity(input);
-  const i = state.activities.findIndex((a) => a.id === activity.id);
-  if (i >= 0) state.activities[i] = activity;
-  else state.activities.push(activity);
-  saveActivities();
-  return activity;
-}
-
-function newSession() {
-  const { focus, level, minutes, equipment } = state.settings;
-  state.session = generateSession({ focus, level, minutes, equipment, seed: Math.floor(Math.random() * 2 ** 31) });
-}
-
-function exportData() {
-  const data = { app: 'padelfit', version: 2, exportedAt: new Date().toISOString(), settings: state.settings, activities: state.activities };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `padelfit-${new Date().toISOString().slice(0, 10)}.json`;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-  toast('Copia descargada');
-}
-
-async function importData(file) {
-  try {
-    const data = JSON.parse(await file.text());
-    const list = Array.isArray(data) ? data : data.activities;
-    if (!Array.isArray(list)) throw new Error('formato');
-    const byId = new Map(state.activities.map((a) => [a.id, a]));
-    for (const raw of list) {
-      const a = normalizeActivity(raw);
-      byId.set(a.id, a);
-    }
-    const added = byId.size - state.activities.length;
-    state.activities = [...byId.values()];
-    if (data.settings) Object.assign(state.settings, data.settings);
-    saveActivities();
-    saveSettings();
-    render();
-    toast(`Copia restaurada: ${list.length} actividades (${added} nuevas)`);
-  } catch {
-    toast('No se ha podido leer el archivo. Elige una copia descargada desde PadelFit.');
-  }
-}
-
-function readActivityForm(form) {
-  const f = new FormData(form);
-  const type = f.get('type');
-  const minutes = Number(f.get('minutes'));
-  const date = new Date(f.get('date'));
-  if (Number.isNaN(date.getTime())) return { error: 'Indica la fecha y la hora.' };
-  if (!minutes || minutes < 1) return { error: 'Indica cuántos minutos duró.' };
-  const input = {
-    id: state.editId ?? undefined,
-    type,
-    date: date.toISOString(),
-    seconds: minutes * 60,
-    rpe: f.get('rpe'),
-    title: f.get('title'),
-    notes: f.get('notes'),
+function makeCtx(route) {
+  app.caches[route] ??= {};
+  return {
+    backend: app.backend,
+    me: app.me,
+    params: app.paramsByRoute[route] ?? {},
+    now: new Date(),
+    settings: app.settings,
+    saveSettings() {
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(app.settings));
+      } catch {
+        // Sin almacenamiento: las preferencias duran lo que la sesión.
+      }
+    },
+    navigate,
+    back,
+    rerender: () => render(),
+    refreshMe,
+    refreshBadge,
+    startSession: (session, { onSave } = {}) => startPlayer(session, { settings: app.settings, onSave }),
+    cache: app.caches[route],
   };
-  const editing = state.activities.find((a) => a.id === state.editId);
-  if (editing) Object.assign(input, { focus: editing.focus, level: editing.level, demo: editing.demo });
-  if (type === 'partido') {
-    const { sets, error } = parseSets([0, 1, 2].map((i) => [f.get(`set${i}a`), f.get(`set${i}b`)]));
-    if (error) return { error };
-    Object.assign(input, {
-      sets,
-      matchKind: f.get('matchKind'),
-      position: f.get('position'),
-      partner: f.get('partner'),
-      rivals: [f.get('rival1'), f.get('rival2')],
-      club: f.get('club'),
-    });
-  }
-  return { input };
 }
 
-// ---------- Eventos ----------
+function currentRoute() {
+  const route = location.hash.replace('#', '') || DEFAULT_ROUTE;
+  if (app.authState !== 'ready') return ONBOARDING_ROUTE;
+  if (route === ONBOARDING_ROUTE || !VIEWS[route]) return DEFAULT_ROUTE;
+  const params = app.paramsByRoute[route] ?? {};
+  if ((REQUIRED_PARAMS[route] ?? []).some((p) => params[p] == null)) return DEFAULT_ROUTE;
+  return route;
+}
+
+function closeOverlays() {
+  document.querySelectorAll('.sheet-backdrop').forEach((el) => el.remove());
+}
+
+export function navigate(route, params = {}) {
+  app.paramsByRoute[route] = params;
+  closeOverlays();
+  if (location.hash === `#${route}`) render({ scrollTop: true });
+  else location.hash = route; // hashchange → render
+}
+
+function back() {
+  if (history.length > 1) history.back();
+  else navigate(DEFAULT_ROUTE);
+}
+
+async function refreshMe() {
+  app.me = await app.backend.getMe();
+  return app.me;
+}
+
+async function refreshBadge() {
+  if (app.authState !== 'ready') return;
+  try {
+    const n = await app.backend.getUnreadCount();
+    $notifCount.textContent = n > 9 ? '9+' : String(n);
+    $notifCount.hidden = n === 0;
+  } catch {
+    // El contador no es crítico.
+  }
+}
+
+async function render({ scrollTop = false } = {}) {
+  const route = currentRoute();
+  const view = VIEWS[route];
+  const token = ++app.renderToken;
+
+  if (app.current && app.current.view !== view) app.current.view.unmount?.();
+  const changed = app.current?.route !== route;
+  app.current = { route, view };
+
+  document.body.dataset.route = route;
+  $tabbar.hidden = route === ONBOARDING_ROUTE;
+  $topbar.querySelector('.topbar-actions').hidden = route === ONBOARDING_ROUTE;
+  document.querySelectorAll('.tabbar [data-route]').forEach((b) => b.classList.toggle('on', b.dataset.route === view.tab));
+
+  if (changed) $view.innerHTML = loading();
+  const ctx = makeCtx(route);
+  let html;
+  try {
+    html = await view.render(ctx);
+  } catch (error) {
+    console.error(error);
+    html = `
+      <div class="card error-card">
+        <h2>Algo ha fallado</h2>
+        <p class="muted">${escapeHtml(error.message || 'No se ha podido cargar esta pantalla.')}</p>
+        <button class="btn" data-action="retry">Reintentar</button>
+      </div>`;
+  }
+  if (token !== app.renderToken) return; // otro render más reciente ganó la carrera
+  $view.innerHTML = html;
+  try {
+    view.mount?.($view, ctx);
+  } catch (error) {
+    console.error(error);
+  }
+  if (changed || scrollTop) window.scrollTo(0, 0);
+}
+
+// ---------- Delegación de eventos ----------
+
+function paramsFrom(el) {
+  const params = {};
+  for (const [key, value] of Object.entries(el.dataset)) {
+    if (key.startsWith('param') && key.length > 5) params[key[5].toLowerCase() + key.slice(6)] = value;
+  }
+  return params;
+}
+
+async function runAction(name, el, event) {
+  const handler = app.current?.view.actions?.[name] ?? globalActions[name];
+  if (name === 'retry') return render();
+  if (!handler) return console.warn(`Acción sin manejador: ${name}`);
+  try {
+    await handler(el, makeCtx(app.current.route), event);
+  } catch (error) {
+    console.error(error);
+    toast(error.message || 'No se ha podido completar la acción.');
+  }
+}
 
 document.addEventListener('click', (event) => {
-  const el = event.target.closest('[data-route], [data-action], [data-set]');
+  const el = event.target.closest('[data-route], [data-action]');
   if (!el || el.closest('#player, .confirm')) return;
-
+  if (el.disabled) return;
   if (el.dataset.route) {
-    if (el.dataset.route === 'registrar') Object.assign(state, { draftType: null, editId: null });
-    return navigate(el.dataset.route);
+    event.preventDefault();
+    return navigate(el.dataset.route, paramsFrom(el));
   }
-
-  if (el.dataset.set) {
-    const key = el.dataset.set;
-    state.settings[key] = ['focus', 'position'].includes(key) ? el.dataset.value : Number(el.dataset.value);
-    if (key !== 'position') state.session = null;
-    saveSettings();
-    return render();
-  }
-
-  switch (el.dataset.action) {
-    case 'open-activity':
-      state.detailId = el.dataset.id;
-      return navigate('actividad');
-    case 'edit-activity':
-      state.editId = el.dataset.id;
-      return navigate('registrar');
-    case 'cancel-edit':
-      state.detailId = state.editId;
-      return navigate('actividad');
-    case 'delete-activity':
-      return askConfirm('¿Eliminar esta actividad? No se puede deshacer.', 'Eliminar', () => {
-        state.activities = state.activities.filter((a) => a.id !== el.dataset.id);
-        saveActivities();
-        toast('Actividad eliminada');
-        navigate('inicio');
-      });
-    case 'load-demo':
-      state.activities.push(...demoActivities());
-      saveActivities();
-      return render();
-    case 'clear-demo':
-      state.activities = state.activities.filter((a) => !a.demo);
-      saveActivities();
-      return render();
-    case 'toggle-equipment': {
-      const eq = new Set(state.settings.equipment);
-      eq.has(el.dataset.value) ? eq.delete(el.dataset.value) : eq.add(el.dataset.value);
-      state.settings.equipment = [...eq];
-      state.session = null;
-      saveSettings();
-      return render();
-    }
-    case 'generate':
-      newSession();
-      render();
-      return document.getElementById('session-preview')?.scrollIntoView({ behavior: 'smooth' });
-    case 'start':
-      return startPlayer(state.session, {
-        settings: state.settings,
-        onSave: (result) => {
-          addActivity({ ...result, type: 'entreno', date: new Date().toISOString() });
-          state.session = null;
-          toast('Sesión guardada en tu muro');
-          navigate('inicio');
-        },
-      });
-    case 'library-category':
-      state.library.category = el.dataset.value;
-      return render();
-    case 'export':
-      return exportData();
-    case 'clear-all':
-      return askConfirm('¿Borrar todas tus actividades? Descarga antes una copia si quieres conservarlas.', 'Borrar todo', () => {
-        state.activities = [];
-        saveActivities();
-        render();
-        toast('Datos borrados');
-      });
-  }
+  if (el.tagName === 'A' && !el.getAttribute('href')?.startsWith('http')) event.preventDefault();
+  runAction(el.dataset.action, el, event);
 });
 
 document.addEventListener('submit', (event) => {
-  if (event.target.id !== 'activity-form') return;
+  const form = event.target.closest('form[data-submit]');
+  if (!form) return;
   event.preventDefault();
-  const { input, error } = readActivityForm(event.target);
-  const $error = document.getElementById('form-error');
-  if (error) {
-    $error.textContent = error;
-    $error.hidden = false;
-    return $error.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-  const wasEditing = Boolean(state.editId);
-  const activity = addActivity(input);
-  state.editId = null;
-  toast(wasEditing ? 'Cambios guardados' : `${ACTIVITY_TYPES[activity.type].label} guardado en tu muro`);
-  if (wasEditing) {
-    state.detailId = activity.id;
-    return navigate('actividad');
-  }
-  navigate('inicio');
-});
-
-document.addEventListener('change', (event) => {
-  const el = event.target;
-  // Cambiar el tipo en el formulario: mostrar campos de partido y proponer una duración típica.
-  if (el.name === 'type' && el.form?.id === 'activity-form') {
-    state.draftType = el.value;
-    el.form.querySelector('[data-section="partido"]').hidden = el.value !== 'partido';
-    const minutes = el.form.elements.minutes;
-    if (!minutes.dataset.touched) minutes.value = ACTIVITY_TYPES[el.value].defaultMinutes;
-  }
-  if (el.dataset.input === 'import' && el.files?.[0]) {
-    importData(el.files[0]);
-    el.value = '';
-  }
+  runAction(form.dataset.submit, form, event);
 });
 
 document.addEventListener('input', (event) => {
-  const el = event.target;
-  if (el.name === 'minutes') el.dataset.touched = '1';
-  if (el.id === 'f-rpe') document.getElementById('rpe-out').textContent = rpeLabel(el.value);
+  const el = event.target.closest('[data-input]');
+  if (el) runAction(el.dataset.input, el, event);
+});
 
-  switch (el.dataset.input) {
-    case 'library-query': {
-      state.library.query = el.value;
-      const pos = el.selectionStart;
-      render();
-      const input = document.getElementById('library-query');
-      input.focus();
-      input.setSelectionRange(pos, pos);
-      return;
-    }
-    case 'weekly-goal':
-      state.settings.weeklyGoal = Number(el.value);
-      document.getElementById('goal-out').textContent = el.value;
-      return saveSettings();
-    case 'sound':
-      state.settings.sound = el.checked;
-      return saveSettings();
-    case 'name':
-      state.settings.name = el.value.trim();
-      return saveSettings();
-  }
+document.addEventListener('change', (event) => {
+  const el = event.target.closest('[data-change]');
+  if (el) runAction(el.dataset.change, el, event);
+});
+
+window.addEventListener('hashchange', () => {
+  closeOverlays();
+  render();
 });
 
 // ---------- Arranque ----------
 
-render();
+async function start() {
+  $view.innerHTML = loading();
+  try {
+    app.backend = await createBackend();
+    await app.backend.init();
+    app.authState = await app.backend.getAuthState();
+    if (app.authState === 'ready') await refreshMe();
+  } catch (error) {
+    console.error(error);
+    $view.innerHTML = `
+      <div class="card error-card">
+        <h2>No se ha podido conectar</h2>
+        <p class="muted">${escapeHtml(error.message || 'Revisa tu conexión e inténtalo de nuevo.')}</p>
+        <button class="btn" onclick="location.reload()">Reintentar</button>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('demo-banner').hidden = app.backend.mode !== 'demo';
+
+  app.backend.onAuthChange(async (state) => {
+    const wasReady = app.authState === 'ready';
+    app.authState = state;
+    app.me = state === 'ready' ? await app.backend.getMe() : null;
+    if (state === 'ready' && !wasReady) navigate(DEFAULT_ROUTE);
+    else render();
+    refreshBadge();
+  });
+
+  app.backend.subscribe((event) => {
+    refreshBadge();
+    if (event.type === 'notification' && app.current?.route === 'notificaciones') render();
+    if (event.type === 'feed' && ['inicio', 'actividad'].includes(app.current?.route)) render();
+  });
+
+  await render();
+  refreshBadge();
+}
+
+start();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});

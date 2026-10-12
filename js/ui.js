@@ -69,3 +69,73 @@ export function toast(message) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
+
+const relFmt = new Intl.RelativeTimeFormat('es-ES', { numeric: 'auto' });
+
+// "hace 5 min", "ayer", "hace 3 días"… y fecha corta a partir de una semana.
+export function timeAgo(date, now = new Date()) {
+  const diff = (new Date(date) - new Date(now)) / 1000;
+  const abs = Math.abs(diff);
+  if (abs < 60) return 'ahora';
+  if (abs < 3600) return relFmt.format(Math.round(diff / 60), 'minute');
+  if (abs < 86400) return relFmt.format(Math.round(diff / 3600), 'hour');
+  if (abs < 7 * 86400) return relFmt.format(Math.round(diff / 86400), 'day');
+  return new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' }).format(new Date(date));
+}
+
+function hue(id) {
+  let h = 0;
+  for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return h;
+}
+
+function initials(name) {
+  const parts = String(name || '?').trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '?') + (parts.length > 1 ? parts.at(-1)[0] : '')).toUpperCase();
+}
+
+// Avatar redondo: foto si la hay, si no iniciales sobre un color estable por usuario.
+export function avatar(profile, size = 'md') {
+  const name = escapeHtml(profile?.name ?? '');
+  if (profile?.avatarUrl) {
+    return `<img class="avatar avatar-${size}" src="${escapeHtml(profile.avatarUrl)}" alt="${name}" loading="lazy" />`;
+  }
+  return `<span class="avatar avatar-${size}" style="--avatar-h:${hue(profile?.id ?? name)}" role="img" aria-label="${name}">${escapeHtml(initials(profile?.name))}</span>`;
+}
+
+export function premiumBadge(profile) {
+  return profile?.isPremium ? '<span class="premium-badge" title="Premium">PRO</span>' : '';
+}
+
+export function emptyState({ icon = '🎾', title, text = '', action = '' }) {
+  return `
+    <div class="empty-state">
+      <span class="empty-icon" aria-hidden="true">${icon}</span>
+      <h2>${escapeHtml(title)}</h2>
+      ${text ? `<p class="muted">${escapeHtml(text)}</p>` : ''}
+      ${action}
+    </div>`;
+}
+
+export function loading() {
+  return '<div class="loading" role="status"><span class="spinner" aria-hidden="true"></span><span class="muted">Cargando…</span></div>';
+}
+
+// Hoja inferior modal (para listas de "¡Vamos!", opciones, etc.). Se cierra tocando fuera o con Escape.
+export function sheet(html) {
+  const el = document.createElement('div');
+  el.className = 'sheet-backdrop';
+  el.innerHTML = `<div class="sheet card" role="dialog" aria-modal="true"><button class="sheet-close icon-plain" data-sheet-close aria-label="Cerrar">✕</button>${html}</div>`;
+  const onKey = (e) => e.key === 'Escape' && close();
+  function close() {
+    el.remove();
+    document.removeEventListener('keydown', onKey);
+  }
+  el.addEventListener('click', (e) => {
+    if (e.target === el || e.target.closest('[data-sheet-close]')) close();
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.append(el);
+  el.querySelector('.sheet').focus?.();
+  return { el, close };
+}

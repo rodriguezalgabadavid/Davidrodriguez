@@ -4,29 +4,40 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f766e" />
-  <meta name="description" content="Registra tus partidos de pádel, sigue tus estadísticas y entrena tu preparación física." />
+  <meta name="description" content="La red social del pádel: comparte tus partidos, completa retos y entrena tu físico." />
   <title>PadelFit</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icons/icon.svg" />
   <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/social.css" />
+  <link rel="stylesheet" href="css/publish.css" />
+  <link rel="stylesheet" href="css/train.css" />
+  <link rel="stylesheet" href="css/profile.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
+    <a class="brand" href="#inicio">
       <img src="icons/icon.svg" alt="" width="28" height="28" />
       <span>PadelFit</span>
+    </a>
+    <div class="topbar-actions">
+      <button class="icon-plain" data-route="buscar" aria-label="Buscar jugadores">🔍</button>
+      <button class="icon-plain bell" data-route="notificaciones" aria-label="Notificaciones">
+        🔔<span id="notif-count" class="notif-count" hidden>0</span>
+      </button>
     </div>
   </header>
+  <p id="demo-banner" class="demo-banner" hidden>Modo demo · la comunidad y los pagos son de ejemplo</p>
 
   <main id="view" class="view" aria-live="polite"></main>
 
   <nav class="tabbar" aria-label="Secciones">
-    <button data-route="inicio"><span class="ico" aria-hidden="true">🏠</span><span>Muro</span></button>
-    <button data-route="entrenar"><span class="ico" aria-hidden="true">⚡</span><span>Entrenar</span></button>
-    <button data-route="registrar" class="tab-add" aria-label="Registrar actividad"><span class="plus" aria-hidden="true">＋</span></button>
-    <button data-route="progreso"><span class="ico" aria-hidden="true">📈</span><span>Progreso</span></button>
-    <button data-route="ejercicios"><span class="ico" aria-hidden="true">📚</span><span>Ejercicios</span></button>
+    <button data-route="inicio"><span class="ico" aria-hidden="true">🏠</span><span>Inicio</span></button>
+    <button data-route="retos"><span class="ico" aria-hidden="true">🏆</span><span>Retos</span></button>
+    <button data-route="publicar" class="tab-add" aria-label="Publicar actividad"><span class="plus" aria-hidden="true">＋</span></button>
+    <button data-route="entrenar"><span class="ico" aria-hidden="true">💪</span><span>Entrenar</span></button>
+    <button data-route="perfil"><span class="ico" aria-hidden="true">👤</span><span>Perfil</span></button>
   </nav>
 
   <section id="player" class="player" hidden aria-modal="true" role="dialog" aria-label="Entrenamiento en curso"></section>

@@ -1,7 +1,7 @@
 {
-  "name": "PadelFit · Tu pádel y tu físico",
+  "name": "PadelFit · La red social del pádel",
   "short_name": "PadelFit",
-  "description": "Registra tus partidos de pádel, sigue tus estadísticas y entrena tu preparación física.",
+  "description": "Comparte tus partidos, completa retos con tus amigos y entrena tu físico para el pádel.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
@@ -10,6 +10,11 @@
   "background_color": "#f1f5f4",
   "theme_color": "#0f766e",
   "icons": [
-    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
   ]
 }
