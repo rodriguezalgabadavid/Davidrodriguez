@@ -1,4 +1,4 @@
-import { matchOutcome, sessionLoad } from './activities.js';
+import { matchOutcome, matchWon, sessionLoad } from './activities.js';
 
 // Estadísticas a partir de las actividades registradas.
 // Cada actividad: { date: ISO string, type, seconds, rpe, ... } (ver activities.js)
@@ -18,7 +18,7 @@ export function startOfWeek(date) {
   return d;
 }
 
-function addDays(date, days) {
+export function addDays(date, days) {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
   return d;
@@ -42,6 +42,45 @@ export function computeStreak(activities, now = new Date()) {
   return streak;
 }
 
+// Semanas (de lunes a domingo) que tienen al menos una actividad, como claves 'YYYY-MM-DD' del lunes.
+function activeWeeks(activities) {
+  return new Set(activities.map((a) => dayKey(startOfWeek(a.date))));
+}
+
+// Racha semanal: semanas consecutivas con al menos una actividad. Si esta semana aún no hay
+// actividad, la racha sigue viva (cuenta desde la semana pasada) hasta que acabe el domingo.
+export function weeklyStreak(activities, now = new Date()) {
+  const weeks = activeWeeks(activities);
+  const current = startOfWeek(now);
+  const activeThisWeek = weeks.has(dayKey(current));
+  let cursor = activeThisWeek ? current : addDays(current, -7);
+  let count = 0;
+  while (weeks.has(dayKey(cursor))) {
+    count++;
+    cursor = addDays(cursor, -7);
+  }
+  return { weeks: count, activeThisWeek };
+}
+
+// La racha semanal más larga de todo el historial.
+export function bestWeeklyStreak(activities) {
+  const weeks = activeWeeks(activities);
+  let best = 0;
+  for (const key of weeks) {
+    const [y, m, d] = key.split('-').map(Number);
+    const start = new Date(y, m - 1, d);
+    if (weeks.has(dayKey(addDays(start, -7)))) continue; // no es el inicio de una racha
+    let run = 0;
+    let cursor = start;
+    while (weeks.has(dayKey(cursor))) {
+      run++;
+      cursor = addDays(cursor, 7);
+    }
+    best = Math.max(best, run);
+  }
+  return best;
+}
+
 export function computeStats(activities, now = new Date()) {
   const weekStart = startOfWeek(now);
   return {
@@ -53,13 +92,13 @@ export function computeStats(activities, now = new Date()) {
 }
 
 function summarize(activities) {
-  const matches = activities.filter((a) => a.type === 'partido').map((a) => matchOutcome(a.sets));
+  const results = activities.filter((a) => a.type === 'partido').map(matchWon);
   return {
     count: activities.length,
     minutes: Math.round(activities.reduce((s, a) => s + (a.seconds || 0), 0) / 60),
     load: activities.reduce((s, a) => s + sessionLoad(a), 0),
-    wins: matches.filter((m) => m.won === true).length,
-    losses: matches.filter((m) => m.won === false).length,
+    wins: results.filter((won) => won === true).length,
+    losses: results.filter((won) => won === false).length,
   };
 }
 
@@ -136,11 +175,13 @@ function record(map, name, won) {
 
 const byPlayed = (a, b) => b.played - a.played || b.won - a.won || a.name.localeCompare(b.name);
 
+// Balance de partidos. Si un partido no tiene marcador se usa el resultado explícito (won);
+// sets y juegos solo suman de los partidos con marcador.
 export function matchStats(activities) {
   const matches = activities
     .filter((a) => a.type === 'partido')
     .sort((a, b) => new Date(a.date) - new Date(b.date))
-    .map((a) => ({ ...a, outcome: matchOutcome(a.sets) }));
+    .map((a) => ({ ...a, outcome: { ...matchOutcome(a.sets ?? []), won: matchWon(a) } }));
 
   const totals = { played: matches.length, won: 0, lost: 0, drawn: 0, setsFor: 0, setsAgainst: 0, gamesFor: 0, gamesAgainst: 0 };
   const partners = new Map();
@@ -184,44 +225,51 @@ export function matchStats(activities) {
 }
 
 export const ACHIEVEMENTS = [
-  { id: 'primer-partido', icon: '🎾', label: 'Primer partido', description: 'Registra tu primer partido.' },
+  { id: 'primer-partido', icon: '🎾', label: 'Primer partido', description: 'Publica tu primer partido.' },
   { id: 'primera-victoria', icon: '🏆', label: 'Primera victoria', description: 'Gana un partido.' },
+  { id: 'primera-foto', icon: '📸', label: 'Primera foto', description: 'Publica una actividad con foto.' },
+  { id: 'popular', icon: '🙌', label: 'Popular', description: 'Recibe 10 «¡Vamos!» en total.' },
+  { id: 'racha-3', icon: '🔥', label: 'En racha', description: 'Gana 3 partidos seguidos.' },
   { id: 'remontada', icon: '🔄', label: 'Remontada', description: 'Gana un partido después de perder el primer set.' },
   { id: 'rosco', icon: '🍩', label: 'Rosco', description: 'Gana un set 6-0.' },
-  { id: 'racha-3', icon: '🔥', label: 'En racha', description: 'Encadena 3 victorias seguidas.' },
-  { id: 'racha-5', icon: '⚡', label: 'Imparable', description: 'Encadena 5 victorias seguidas.' },
   { id: 'torneo', icon: '🥇', label: 'Competidor', description: 'Juega un partido de torneo.' },
-  { id: 'diez-partidos', icon: '🔟', label: '10 partidos', description: 'Registra 10 partidos.' },
+  { id: 'diez-partidos', icon: '🔟', label: '10 partidos', description: 'Publica 10 partidos.' },
+  { id: 'constancia', icon: '📅', label: 'Constancia', description: 'Haz alguna actividad 4 semanas seguidas.' },
   { id: 'fisico-5', icon: '💪', label: 'Base física', description: 'Completa 5 sesiones de preparación física.' },
-  { id: 'fisico-20', icon: '🦵', label: 'Piernas de acero', description: 'Completa 20 sesiones de preparación física.' },
-  { id: 'semana-4', icon: '📅', label: 'Semana completa', description: 'Haz 4 actividades en una misma semana.' },
-  { id: 'horas-25', icon: '⏱️', label: '25 horas en pista', description: 'Suma 25 horas entre partidos y clases.' },
+  { id: 'plan-terminado', icon: '🎓', label: 'Plan terminado', description: 'Termina un plan de preparación física.' },
+  { id: 'primer-reto', icon: '⭐', label: 'Primer reto', description: 'Completa tu primer reto.' },
+  { id: 'tres-retos', icon: '🏅', label: 'Cazarretos', description: 'Completa 3 retos.' },
 ];
 
-export function achievements(activities) {
+// completedChallenges: instanceId[] de retos completados (challenges.js).
+// finishedPlans: planes terminados (PlanState.finished).
+export function achievements(activities, { completedChallenges = [], finishedPlans = [] } = {}) {
   const stats = matchStats(activities);
   const matches = activities.filter((a) => a.type === 'partido');
   const fitness = activities.filter((a) => a.type === 'entreno').length;
-  const courtHours = activities.filter((a) => a.type !== 'entreno').reduce((s, a) => s + (a.seconds || 0), 0) / 3600;
-  const perWeek = new Map();
-  for (const a of activities) {
-    const k = dayKey(startOfWeek(a.date));
-    perWeek.set(k, (perWeek.get(k) || 0) + 1);
-  }
+  const kudos = activities.reduce((s, a) => s + (Number(a.kudosCount) || 0), 0);
 
   const unlocked = {
     'primer-partido': stats.played >= 1,
     'primera-victoria': stats.won >= 1,
+    'primera-foto': activities.some((a) => Boolean(a.photoUrl)),
+    popular: kudos >= 10,
+    'racha-3': stats.bestWinStreak >= 3,
     remontada: matches.some((m) => m.sets?.length > 1 && m.sets[0][0] < m.sets[0][1] && matchOutcome(m.sets).won === true),
     rosco: matches.some((m) => m.sets?.some(([a, b]) => a === 6 && b === 0)),
-    'racha-3': stats.bestWinStreak >= 3,
-    'racha-5': stats.bestWinStreak >= 5,
     torneo: matches.some((m) => m.matchKind === 'torneo'),
     'diez-partidos': stats.played >= 10,
+    constancia: bestWeeklyStreak(activities) >= 4,
     'fisico-5': fitness >= 5,
-    'fisico-20': fitness >= 20,
-    'semana-4': [...perWeek.values()].some((n) => n >= 4),
-    'horas-25': courtHours >= 25,
+    'plan-terminado': finishedPlans.length >= 1,
+    'primer-reto': completedChallenges.length >= 1,
+    'tres-retos': completedChallenges.length >= 3,
   };
   return ACHIEVEMENTS.map((a) => ({ ...a, unlocked: Boolean(unlocked[a.id]) }));
+}
+
+// Logros desbloqueados en `after` que no lo estaban en `before` (para la pantalla de celebración).
+export function newlyUnlocked(before = [], after = []) {
+  const had = new Set(before.filter((a) => a.unlocked).map((a) => a.id));
+  return after.filter((a) => a.unlocked && !had.has(a.id));
 }

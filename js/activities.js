@@ -1,6 +1,7 @@
-// Actividades del muro: partidos, clases y sesiones de preparación física.
-// Forma común: { id, type, date (ISO), seconds, rpe (1-10), title?, notes? }
-// Partido además: { matchKind, position, partner, rivals: [a, b], club, sets: [[nosotros, ellos], ...] }
+import { FOCUSES } from './data.js';
+
+// Actividades de la red social: partidos, clases y sesiones de preparación física.
+// Modelo completo (Activity) e ActivityInput: ver docs/ARCHITECTURE.md.
 
 export const ACTIVITY_TYPES = {
   partido: { label: 'Partido', icon: '🎾', defaultMinutes: 90 },
@@ -16,6 +17,17 @@ export const MATCH_KINDS = {
 };
 
 export const POSITIONS = { drive: 'Drive', reves: 'Revés' };
+
+// Límites de los campos editables (coinciden con lo que acepta la base de datos).
+export const LIMITS = {
+  seconds: 36000, // 10 h
+  name: 40, // compañero, rivales y club
+  rivals: 2,
+  title: 80,
+  text: 2000,
+  sets: 5,
+  games: 99,
+};
 
 export function newId() {
   return `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -55,57 +67,120 @@ export function matchOutcome(sets = []) {
   return { setsFor, setsAgainst, gamesFor, gamesAgainst, won };
 }
 
+// Resultado de un partido: el marcador manda; sin marcador, lo que dijo el jugador (won).
+export function matchWon(activity) {
+  if (activity?.type !== 'partido') return null;
+  if (activity.sets?.length) return matchOutcome(activity.sets).won;
+  return typeof activity.won === 'boolean' ? activity.won : null;
+}
+
 export function formatScore(sets = []) {
   return sets.map(([a, b]) => `${a}-${b}`).join(' ');
 }
 
 // Carga interna de la sesión (método sRPE de Foster): minutos × esfuerzo percibido.
+// Sin RPE apuntado la carga es 0.
 export function sessionLoad(activity) {
   return Math.round(((activity.seconds || 0) / 60) * (activity.rpe || 0));
 }
 
 export function activityTitle(activity) {
-  if (activity.title) return activity.title;
+  const title = String(activity?.title ?? '').trim();
+  if (title) return title;
   if (activity.type === 'partido') {
-    const { won } = matchOutcome(activity.sets);
-    const kind = MATCH_KINDS[activity.matchKind] ?? 'Partido';
-    const verdict = won === null ? 'Empate' : won ? 'Victoria' : 'Derrota';
-    return `${verdict} · ${kind}`;
+    const won = matchWon(activity);
+    const verdict = won === true ? 'Victoria' : won === false ? 'Derrota' : activity.sets?.length ? 'Empate' : 'Partido';
+    const kind = MATCH_KINDS[activity.matchKind];
+    return kind ? `${verdict} · ${kind}` : verdict;
   }
-  return ACTIVITY_TYPES[activity.type]?.label ?? 'Actividad';
+  if (activity.type === 'entreno') return FOCUSES[activity.focus]?.label ?? 'Preparación física';
+  if (activity.type === 'clase') return 'Clase';
+  return 'Actividad';
 }
 
-const cleanName = (s) => String(s ?? '').trim().replace(/\s+/g, ' ');
+const cleanLine = (s, max) => String(s ?? '').trim().replace(/\s+/g, ' ').slice(0, max).trim();
 
-// Normaliza lo que llega del formulario o de una importación.
-export function normalizeActivity(input) {
+function cleanDate(value) {
+  const d = value instanceof Date ? new Date(value) : new Date(value ?? Date.now());
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
+function cleanRpe(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : null;
+}
+
+// Sets válidos: pares de enteros 0-99 sin empate. Lo demás se descarta.
+function cleanSets(sets) {
+  if (!Array.isArray(sets)) return [];
+  const out = [];
+  for (const pair of sets) {
+    if (!Array.isArray(pair) || pair.length < 2) continue;
+    const [a, b] = [pair[0], pair[1]].map((v) => (v === '' || v === null ? NaN : Number(v)));
+    const ok = (n) => Number.isInteger(n) && n >= 0 && n <= LIMITS.games;
+    if (!ok(a) || !ok(b) || a === b) continue;
+    out.push([a, b]);
+    if (out.length === LIMITS.sets) break;
+  }
+  return out;
+}
+
+function cleanWon(value) {
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return null;
+}
+
+function cleanPlan(plan) {
+  if (!plan || typeof plan !== 'object') return null;
+  const planId = cleanLine(plan.planId, 40);
+  if (!planId) return null;
+  return { planId, sessionKey: cleanLine(plan.sessionKey, 40) };
+}
+
+// Sanea lo que llega del formulario, de una importación o del backend antes de guardar.
+// Devuelve solo los campos de ActivityInput.
+export function normalizeActivityInput(input = {}) {
   const type = ACTIVITY_TYPES[input.type] ? input.type : 'entreno';
-  const activity = {
-    id: input.id || newId(),
+  const isMatch = type === 'partido';
+  const sets = isMatch ? cleanSets(input.sets) : [];
+  let won = null;
+  if (isMatch) won = sets.length ? matchOutcome(sets).won : cleanWon(input.won);
+  return {
     type,
-    date: new Date(input.date || Date.now()).toISOString(),
-    seconds: Math.max(0, Math.round(Number(input.seconds) || 0)),
-    rpe: Math.min(10, Math.max(1, Math.round(Number(input.rpe) || 5))),
+    date: cleanDate(input.date),
+    seconds: Math.min(LIMITS.seconds, Math.max(0, Math.round(Number(input.seconds) || 0))),
+    rpe: cleanRpe(input.rpe),
+    won,
+    sets,
+    matchKind: isMatch && MATCH_KINDS[input.matchKind] ? input.matchKind : null,
+    partner: cleanLine(input.partner, LIMITS.name),
+    rivals: isMatch
+      ? (Array.isArray(input.rivals) ? input.rivals : []).map((r) => cleanLine(r, LIMITS.name)).filter(Boolean).slice(0, LIMITS.rivals)
+      : [],
+    club: cleanLine(input.club, LIMITS.name),
+    title: cleanLine(input.title, LIMITS.title),
+    text: String(input.text ?? '').replace(/\r\n?/g, '\n').trim().slice(0, LIMITS.text).trim(),
+    plan: cleanPlan(input.plan),
+    focus: type === 'entreno' && FOCUSES[input.focus] ? input.focus : null,
   };
-  if (cleanName(input.title)) activity.title = cleanName(input.title);
-  if (String(input.notes ?? '').trim()) activity.notes = String(input.notes).trim();
-  if (input.focus) activity.focus = input.focus;
-  if (input.level) activity.level = input.level;
-  if (input.demo) activity.demo = true;
-  if (type === 'partido') {
-    activity.matchKind = MATCH_KINDS[input.matchKind] ? input.matchKind : 'amistoso';
-    if (POSITIONS[input.position]) activity.position = input.position;
-    activity.partner = cleanName(input.partner);
-    activity.rivals = (input.rivals ?? []).map(cleanName).filter(Boolean);
-    activity.club = cleanName(input.club);
-    activity.sets = (input.sets ?? []).map(([a, b]) => [Number(a), Number(b)]);
-  }
-  return activity;
 }
 
-// El historial de la primera versión de la app solo tenía sesiones de preparación física.
-export function migrateLegacyHistory(history) {
-  return history.map((h) => normalizeActivity({ ...h, type: 'entreno' }));
+// Convierte lo que guardaron versiones anteriores de la app en ActivityInput:
+// - v1: historial de sesiones de físico { date, title, seconds, rpe, focus, level }.
+// - v2: actividades { type, date, seconds, rpe, sets, partner, rivals, club, matchKind, notes, title, focus }.
+// Los datos de ejemplo de la v2 (demo: true) no son del usuario y se descartan.
+export function fromLegacy(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((item) => item && typeof item === 'object' && !item.demo)
+    .map((item) => normalizeActivityInput({
+      ...item,
+      type: ACTIVITY_TYPES[item.type] ? item.type : 'entreno',
+      text: item.text ?? item.notes ?? '',
+      plan: null,
+    }));
 }
 
 export function sortByDateDesc(activities) {
@@ -124,32 +199,4 @@ export function knownNames(activities) {
     if (a.club) clubs.set(a.club.toLowerCase(), a.club);
   }
   return { people: [...people.values()].sort(), clubs: [...clubs.values()].sort() };
-}
-
-// Datos de ejemplo para enseñar la app vacía. Se marcan con demo: true para poder borrarlos.
-export function demoActivities(now = new Date()) {
-  const at = (daysAgo, hour) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() - daysAgo);
-    d.setHours(hour, 0, 0, 0);
-    return d.toISOString();
-  };
-  const match = (daysAgo, hour, extra) =>
-    normalizeActivity({ type: 'partido', date: at(daysAgo, hour), seconds: 90 * 60, demo: true, ...extra });
-  return [
-    match(1, 20, { matchKind: 'liga', position: 'reves', partner: 'Javi', rivals: ['Marta', 'Luis'], club: 'Club Pádel Norte', sets: [[6, 4], [3, 6], [7, 5]], rpe: 8, notes: 'Remontada en el tercero. Las bandejas al cristal funcionaron.' }),
-    normalizeActivity({ type: 'entreno', date: at(2, 9), seconds: 32 * 60, rpe: 7, title: 'Potencia y salto', focus: 'potencia', level: 2, demo: true }),
-    match(4, 19, { matchKind: 'amistoso', position: 'reves', partner: 'Javi', rivals: ['Carlos', 'Ana'], club: 'Club Pádel Norte', sets: [[6, 2], [6, 3]], rpe: 6 }),
-    normalizeActivity({ type: 'clase', date: at(5, 18), seconds: 60 * 60, rpe: 5, title: 'Clase: salida de pared', demo: true }),
-    match(7, 11, { matchKind: 'torneo', position: 'drive', partner: 'Pablo', rivals: ['Marta', 'Luis'], club: 'Indoor Sur', sets: [[4, 6], [5, 7]], rpe: 9, notes: 'Mucho globo, nos faltó paciencia.' }),
-    normalizeActivity({ type: 'entreno', date: at(8, 9), seconds: 28 * 60, rpe: 6, title: 'Prevención de lesiones', focus: 'prevencion', level: 2, demo: true }),
-    match(10, 20, { matchKind: 'liga', position: 'reves', partner: 'Javi', rivals: ['Sergio', 'Nacho'], club: 'Club Pádel Norte', sets: [[7, 6], [6, 4]], rpe: 7 }),
-    match(13, 19, { matchKind: 'americana', position: 'reves', partner: 'Pablo', rivals: ['Carlos', 'Ana'], club: 'Indoor Sur', sets: [[3, 6]], rpe: 6 }),
-    normalizeActivity({ type: 'entreno', date: at(15, 9), seconds: 30 * 60, rpe: 6, title: 'Agilidad en pista', focus: 'agilidad', level: 2, demo: true }),
-    match(17, 20, { matchKind: 'liga', position: 'reves', partner: 'Javi', rivals: ['Eva', 'Pedro'], club: 'Club Pádel Norte', sets: [[6, 0], [6, 3]], rpe: 6 }),
-    normalizeActivity({ type: 'clase', date: at(19, 18), seconds: 60 * 60, rpe: 5, title: 'Clase: bandeja y víbora', demo: true }),
-    match(22, 19, { matchKind: 'amistoso', position: 'drive', partner: 'Pablo', rivals: ['Sergio', 'Nacho'], club: 'Indoor Sur', sets: [[6, 4], [4, 6], [10, 7]], rpe: 8 }),
-    normalizeActivity({ type: 'entreno', date: at(24, 9), seconds: 30 * 60, rpe: 6, title: 'Core y golpeo', focus: 'core', level: 2, demo: true }),
-    match(26, 20, { matchKind: 'liga', position: 'reves', partner: 'Javi', rivals: ['Marta', 'Luis'], club: 'Club Pádel Norte', sets: [[5, 7], [6, 7]], rpe: 7 }),
-  ];
 }
