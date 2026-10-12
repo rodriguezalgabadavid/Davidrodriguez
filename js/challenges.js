@@ -147,9 +147,9 @@ export function currentChallenges(now = new Date()) {
   });
 }
 
-export function challengeProgress(challenge, myActivities, now = new Date()) {
+export function challengeProgress(challenge, myActivities = [], now = new Date()) {
   const { from, to } = periodRange(challenge.period, now);
-  const value = metricValue(challenge.metric, myActivities.filter((a) => inRange(a, from, to)));
+  const value = metricValue(challenge.metric, (myActivities ?? []).filter((a) => inRange(a, from, to)));
   return {
     instanceId: instanceId(challenge, now),
     value,
@@ -164,10 +164,10 @@ export function challengeProgress(challenge, myActivities, now = new Date()) {
 
 // Clasificación del periodo actual entre las actividades de tu círculo (tú + a quien sigues).
 // Aparece todo el que tenga alguna actividad en la lista, aunque su valor sea 0.
-export function leaderboard(challenge, circleActivities, now = new Date()) {
+export function leaderboard(challenge, circleActivities = [], now = new Date()) {
   const { from, to } = periodRange(challenge.period, now);
   const users = new Map();
-  for (const a of circleActivities) {
+  for (const a of circleActivities ?? []) {
     if (!a?.userId) continue;
     const entry = users.get(a.userId) ?? { userId: a.userId, author: a.author ?? null, isMine: Boolean(a.isMine), list: [] };
     if (!entry.author && a.author) entry.author = a.author;
@@ -182,11 +182,11 @@ export function leaderboard(challenge, circleActivities, now = new Date()) {
 
 // De los retos a los que me apunté, los que ya he completado (en su propio periodo).
 export function completedChallenges(joinedIds = [], myActivities = []) {
-  return joinedIds.filter((id) => {
+  return (joinedIds ?? []).filter((id) => {
     const challenge = getChallenge(String(id).split(':')[0]);
     const range = rangeFromInstanceId(id);
     if (!challenge || !range) return false;
-    const value = metricValue(challenge.metric, myActivities.filter((a) => inRange(a, range.from, range.to)));
+    const value = metricValue(challenge.metric, (myActivities ?? []).filter((a) => inRange(a, range.from, range.to)));
     return value >= challenge.target;
   });
 }

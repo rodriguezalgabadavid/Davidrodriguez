@@ -248,6 +248,8 @@ export function achievements(activities, { completedChallenges = [], finishedPla
   const matches = activities.filter((a) => a.type === 'partido');
   const fitness = activities.filter((a) => a.type === 'entreno').length;
   const kudos = activities.reduce((s, a) => s + (Number(a.kudosCount) || 0), 0);
+  const challengesDone = Array.isArray(completedChallenges) ? completedChallenges.length : 0;
+  const plansDone = Array.isArray(finishedPlans) ? finishedPlans.length : 0;
 
   const unlocked = {
     'primer-partido': stats.played >= 1,
@@ -261,15 +263,15 @@ export function achievements(activities, { completedChallenges = [], finishedPla
     'diez-partidos': stats.played >= 10,
     constancia: bestWeeklyStreak(activities) >= 4,
     'fisico-5': fitness >= 5,
-    'plan-terminado': finishedPlans.length >= 1,
-    'primer-reto': completedChallenges.length >= 1,
-    'tres-retos': completedChallenges.length >= 3,
+    'plan-terminado': plansDone >= 1,
+    'primer-reto': challengesDone >= 1,
+    'tres-retos': challengesDone >= 3,
   };
   return ACHIEVEMENTS.map((a) => ({ ...a, unlocked: Boolean(unlocked[a.id]) }));
 }
 
 // Logros desbloqueados en `after` que no lo estaban en `before` (para la pantalla de celebración).
 export function newlyUnlocked(before = [], after = []) {
-  const had = new Set(before.filter((a) => a.unlocked).map((a) => a.id));
-  return after.filter((a) => a.unlocked && !had.has(a.id));
+  const had = new Set((before ?? []).filter((a) => a.unlocked).map((a) => a.id));
+  return (after ?? []).filter((a) => a.unlocked && !had.has(a.id));
 }
