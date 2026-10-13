@@ -72,7 +72,7 @@ html:has(body[data-view='publicar']) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start; /* iconos alineados aunque una etiqueta ocupe dos líneas */
   gap: 0.45rem;
   min-height: 6rem;
   padding: 0.85rem 0.35rem 0.75rem;
@@ -97,6 +97,7 @@ html:has(body[data-view='publicar']) {
   color: var(--text);
   transition: background 0.15s, color 0.15s;
 }
+.post-result-label { max-width: 100%; overflow-wrap: anywhere; }
 .post-result-check {
   position: absolute;
   top: 0.4rem;
@@ -279,7 +280,9 @@ html:has(body[data-view='publicar']) {
 .post-label .icon { color: var(--muted); }
 
 .post-rpe-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 0.75rem; }
-.post-rpe-out { font-weight: 600; color: var(--primary); font-variant-numeric: tabular-nums; }
+.post-rpe-out { font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Cuando se ha movido la barra, el valor pasa a azul y en negrita */
+.post-row:has(#post-rpe[data-set='1']) .post-rpe-out { font-weight: 700; color: var(--primary); }
 .post-rpe-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
 .post-rpe-foot .hint { flex: 1; }
 .post-rpe-clear { min-height: 2.75rem; padding: 0 0.25rem; }
@@ -378,16 +381,17 @@ html:has(body[data-view='publicar']) {
 .onb-title { margin: 0; font-size: 2rem; line-height: 1.1; }
 .onb-lead { margin: 0; font-size: 1.05rem; color: var(--muted); }
 
+/* Tres razones para entrar: filas con icono en el móvil, tres columnas cuando hay sitio */
 .onb-props {
   list-style: none;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(6.25rem, 1fr));
-  gap: 0.75rem;
-  margin: 0.75rem 0 0;
-  padding: 1rem 0 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0.75rem 0 -0.25rem;
+  padding: 0;
   border-top: 1px solid var(--border);
 }
-.onb-props li { display: flex; flex-direction: column; align-items: center; gap: 0.45rem; text-align: center; }
+.onb-prop { display: flex; align-items: center; gap: 0.85rem; min-height: 3.5rem; padding: 0.6rem 0; }
+.onb-prop + .onb-prop { border-top: 1px solid var(--border); }
 .onb-prop-icon,
 .onb-sent-icon {
   display: grid;
@@ -397,8 +401,14 @@ html:has(body[data-view='publicar']) {
   color: var(--primary-strong);
 }
 .onb-prop-icon { width: 2.75rem; height: 2.75rem; }
-.onb-prop-text { font-size: 0.875rem; line-height: 1.3; color: var(--muted); }
-.onb-prop-text strong { display: block; margin-bottom: 0.1rem; font-size: 0.95rem; color: var(--text); }
+.onb-prop-text { display: flex; flex-direction: column; font-size: 0.875rem; line-height: 1.35; color: var(--muted); }
+.onb-prop-text strong { font-size: 1rem; color: var(--text); }
+
+@media (min-width: 560px) {
+  .onb-props { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 0; padding-top: 1rem; }
+  .onb-prop { flex-direction: column; gap: 0.45rem; min-height: 0; padding: 0; text-align: center; }
+  .onb-prop + .onb-prop { border-top: 0; }
+}
 
 /* Tarjetas de los pasos */
 .onb-card { display: flex; flex-direction: column; gap: 1rem; }
@@ -443,7 +453,7 @@ html:has(body[data-view='publicar']) {
 .onb-player-tags { display: inline-flex; align-items: center; gap: 0.35rem; }
 .onb-player-tags .premium-badge { margin-left: 0; }
 .onb-player-meta { font-size: 0.875rem; line-height: 1.35; color: var(--muted); }
-.onb-pick { flex-shrink: 0; gap: 0.3rem; min-width: 7.25rem; padding: 0.45rem 0.9rem; border-color: var(--primary); color: var(--primary); }
+.onb-pick { flex-shrink: 0; gap: 0.3rem; min-width: 7.75rem; padding: 0.45rem 0.7rem; border-color: var(--primary); color: var(--primary); }
 .onb-pick:hover { background: var(--primary-soft); }
 .onb-pick[aria-pressed='true'] { border-color: var(--border-strong); color: var(--muted); }
 .onb-pick[aria-pressed='true']:hover { background: var(--surface-2); }
@@ -452,6 +462,7 @@ html:has(body[data-view='publicar']) {
 .onb-empty { display: flex; align-items: flex-start; gap: 0.6rem; margin: 0; }
 .onb-picked { margin: 0; text-align: center; font-size: 0.875rem; color: var(--muted); }
 .onb-picked:empty { display: none; }
+.onb-start[aria-busy='true'] { cursor: progress; }
 .onb-back { align-self: center; }
 
 .onb-demo-note {
@@ -518,27 +529,38 @@ html:has(body[data-view='publicar']) {
 
 .cel-box { min-height: 100%; display: flex; flex-direction: column; color: var(--text); }
 
-/* Cabecera: la pista, con el resultado en grande */
+/* Cabecera: la pista vista desde arriba con el icono (o la foto) sobre la red, y debajo el resultado en grande */
 .cel-head {
   position: relative;
   overflow: hidden;
-  display: grid;
-  place-items: center;
-  padding: calc(env(safe-area-inset-top, 0px) + 2rem) 1.25rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: calc(env(safe-area-inset-top, 0px) + 1.25rem) 1.25rem 1.75rem;
   text-align: center;
   color: #fff;
   background:
     radial-gradient(120% 90% at 50% 0%, rgb(255 255 255 / 0.14), transparent 60%),
     linear-gradient(180deg, var(--court), var(--court-deep));
 }
-.cel-court {
+.cel-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(100%, 22rem);
+  aspect-ratio: 2 / 1;
+}
+.cel-court { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.6; }
+.cel-ball {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: min(92%, 36rem);
-  height: 84%;
-  opacity: 0.22;
-  transform: translate(-50%, -50%);
+  left: 23%;
+  top: 27%;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 3px 6px rgb(0 0 0 / 0.3);
 }
 .cel-head-inner {
   position: relative;
@@ -550,9 +572,9 @@ html:has(body[data-view='publicar']) {
   animation: cel-rise 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
 .cel-icon {
+  position: relative;
   width: 5rem;
   height: 5rem;
-  margin-bottom: 0.5rem;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -562,9 +584,9 @@ html:has(body[data-view='publicar']) {
   animation: cel-bounce 0.7s 0.15s both;
 }
 .cel-photo {
+  position: relative;
   width: 7rem;
   height: 7rem;
-  margin-bottom: 0.5rem;
   border-radius: 50%;
   object-fit: cover;
   border: 4px solid #fff;

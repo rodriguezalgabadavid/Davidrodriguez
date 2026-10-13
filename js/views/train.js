@@ -1,6 +1,7 @@
 import { CONFIG } from '../config.js';
 import { EXERCISES, FOCUSES, LEVELS } from '../data.js';
 import { generateSession } from '../generator.js';
+import { icon } from '../icons.js';
 import {
   PLANS,
   PREMIUM_QUESTIONS,
@@ -24,6 +25,16 @@ const EQUIPMENT_LABELS = Object.fromEntries(
   (PREMIUM_QUESTIONS.find((q) => q.id === 'equipment')?.options ?? []).map((o) => [o.value, o.label]),
 );
 
+// Icono de cada plan (en la interfaz, iconos en lugar de los emojis del catálogo).
+const PLAN_ICONS = {
+  'primeros-pasos': 'target',
+  pretemporada: 'calendar',
+  'piernas-explosivas': 'bolt',
+  'hombro-sano': 'medal',
+  'tercer-set': 'flame',
+  premium: 'crown',
+};
+
 let starting = false; // evita abrir dos veces el temporizador con un doble toque
 
 // ---------- Utilidades compartidas con premium.js ----------
@@ -42,8 +53,8 @@ export function levelLabel(level) {
 export function progressBar(pct, label) {
   const value = Math.min(100, Math.max(0, Math.round(Number(pct) || 0)));
   return `
-    <div class="plan-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${value}" aria-label="${escapeHtml(label)}">
-      <span style="width:${value}%"></span>
+    <div class="progress plan-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${value}" aria-label="${escapeHtml(label)}">
+      <div style="width:${value}%"></div>
     </div>`;
 }
 
@@ -51,6 +62,8 @@ export function progressBar(pct, label) {
 export function sessionNumber(plan, planSession) {
   return planSessions(plan).findIndex((s) => s.key === planSession?.key) + 1;
 }
+
+export const planIcon = (planId) => PLAN_ICONS[planId] ?? 'dumbbell';
 
 const isFinished = (planState, planId) =>
   (planState?.finished ?? []).some((f) => (f?.planId ?? f) === planId);
@@ -125,21 +138,84 @@ export async function playSession(ctx, session, { planSession = null, sessionKey
   ctx.startSession(session, { onSave: save });
 }
 
+// ---------- Piezas compartidas con premium.js ----------
+
+// Cabecera de un plan: icono redondo + etiqueta pequeña + nombre.
+export function planHead({ planId, eyebrow, title, level = 'h2', id = '', meta = '' }) {
+  const premium = planId === 'premium';
+  return `
+    <div class="plan-head">
+      <span class="plan-icon${premium ? ' is-premium' : ''}" aria-hidden="true">${icon(planIcon(planId), { size: 22 })}</span>
+      <div class="plan-head-text">
+        ${eyebrow ? `<span class="label">${eyebrow}</span>` : ''}
+        <${level}${id ? ` id="${id}"` : ''}>${title}</${level}>
+        ${meta ? `<span class="plan-meta">${meta}</span>` : ''}
+      </div>
+    </div>`;
+}
+
+// "Semana 2 de 4 · 3/8 sesiones" + barra de progreso.
+export function planProgressBlock(plan, progress, label) {
+  return `
+    <div class="plan-progress">
+      <div class="plan-progress-line">
+        <strong class="plan-week-now">Semana ${progress.currentWeek} <span>de ${plan.weeks}</span></strong>
+        <span class="muted">${progress.done} de ${progress.total} sesiones</span>
+      </div>
+      ${progressBar(progress.pct, label)}
+    </div>`;
+}
+
+// Siguiente sesión: número, enfoque y detalle (minutos · nivel · material).
+export function nextSessionBlock(plan, next, equipment) {
+  return `
+    <div class="plan-next">
+      <span class="plan-next-num" aria-hidden="true">${sessionNumber(plan, next)}</span>
+      <span class="plan-next-body">
+        <span class="label">Siguiente sesión</span>
+        <strong>${escapeHtml(focusLabel(next))}</strong>
+        <span class="plan-next-meta">
+          <span>${icon('clock', { size: 16 })}≈ ${next.minutes} min</span>
+          <span>${icon('target', { size: 16 })}${escapeHtml(levelLabel(next.level))}</span>
+          <span>${icon('dumbbell', { size: 16 })}${escapeHtml(equipmentText(equipment))}</span>
+        </span>
+      </span>
+    </div>`;
+}
+
+export function planDone(text) {
+  return `<p class="plan-finished">${icon('medal', { size: 22 })}<span>${text}</span></p>`;
+}
+
 // ---------- Tarjetas ----------
+
+// Decoración de pista para las cabeceras de Premium (como la ilustración del marcador).
+export function courtLines(className = 'prem-lines') {
+  return `
+    <svg class="${className}" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <rect x="6" y="6" width="188" height="88" rx="2"/>
+      <path d="M37 6v88M163 6v88M37 50h126"/>
+      <path class="prem-lines-net" d="M100 2v96"/>
+    </svg>`;
+}
 
 function upsellCard(ctx) {
   const demo = ctx.backend.mode === 'demo';
   return `
-    <button class="card prem-upsell" data-route="premium">
-      <span class="prem-crown" aria-hidden="true">👑</span>
-      <span class="prem-upsell-body">
-        <span class="prem-eyebrow">Premium</span>
-        <strong class="prem-upsell-title">Plan personalizado para tu pádel</strong>
-        <span class="prem-upsell-text">Se adapta a tu nivel, a tus partidos y a tus molestias.</span>
-        <span class="prem-upsell-price">${escapeHtml(CONFIG.premiumPrice)}/${escapeHtml(CONFIG.premiumPeriod)}${demo ? ' · en la demo, gratis y sin pagos' : ''}</span>
-      </span>
-      <span class="prem-upsell-go" aria-hidden="true">›</span>
-    </button>`;
+    <section class="prem-upsell" aria-labelledby="prem-upsell-title">
+      ${courtLines()}
+      <div class="prem-upsell-top">
+        <span class="prem-crown" aria-hidden="true">${icon('crown', { size: 22 })}</span>
+        <span class="prem-eyebrow">PadelFit Premium</span>
+      </div>
+      <h2 class="prem-upsell-title" id="prem-upsell-title">Tu plan personalizado de pádel</h2>
+      <p class="prem-upsell-text">Se adapta a tu nivel, a tus partidos y a tus molestias.</p>
+      <div class="prem-upsell-foot">
+        <p class="prem-upsell-price"><strong>${escapeHtml(CONFIG.premiumPrice)}</strong><span>/${escapeHtml(CONFIG.premiumPeriod)}</span></p>
+        <button class="btn accent prem-upsell-cta" data-route="premium">Ver Premium${icon('chevron', { size: 18 })}</button>
+      </div>
+      ${demo ? `<p class="prem-upsell-demo">${icon('info', { size: 16 })}En la demo es gratis y sin pagos</p>` : ''}
+    </section>`;
 }
 
 function premiumCard(ctx, { answers, premiumPlan, planState, activePlan }) {
@@ -148,19 +224,11 @@ function premiumCard(ctx, { answers, premiumPlan, planState, activePlan }) {
   if (!isPremium) return upsellCard(ctx);
 
   const button = (label) => `<button class="btn big${activePlan ? '' : ' primary'}" data-route="premium">${label}</button>`;
-  const head = (title) => `
-    <div class="plan-head">
-      <span class="plan-icon prem-icon" aria-hidden="true">👑</span>
-      <div class="plan-head-text">
-        <span class="prem-eyebrow">Premium</span>
-        <h2>${title}</h2>
-      </div>
-    </div>`;
 
   if (!answers || !premiumPlan) {
     return `
       <section class="card prem-card">
-        ${head('Crea tu plan personalizado')}
+        ${planHead({ planId: 'premium', eyebrow: 'Premium', title: 'Crea tu plan personalizado' })}
         <p class="muted">${PREMIUM_QUESTIONS.length} preguntas rápidas y lo adaptamos a tu nivel, tus partidos y tus molestias.</p>
         ${button('Crear mi plan')}
       </section>`;
@@ -169,25 +237,21 @@ function premiumCard(ctx, { answers, premiumPlan, planState, activePlan }) {
   const next = nextPlanSession(premiumPlan, planState);
   return `
     <section class="card prem-card">
-      ${head('Tu plan personalizado')}
-      ${next ? `<p class="prem-card-next">Siguiente: <strong>${escapeHtml(focusLabel(next))}</strong> · ${next.minutes} min</p>` : ''}
+      ${planHead({ planId: 'premium', eyebrow: 'Premium', title: 'Tu plan personalizado' })}
+      ${next ? `<p class="prem-card-next">${icon('play', { size: 16 })}<span>Siguiente: <strong>${escapeHtml(focusLabel(next))}</strong> · ${next.minutes} min</span></p>` : ''}
       ${button('Ver mi plan')}
     </section>`;
 }
 
 function lockedPremiumCard() {
   return `
-    <section class="card plan-active plan-premium">
-      <div class="plan-head">
-        <span class="plan-icon prem-icon" aria-hidden="true">👑</span>
-        <div class="plan-head-text">
-          <span class="label">Tu plan</span>
-          <h2>Tu plan personalizado</h2>
-        </div>
-      </div>
+    <section class="card plan-active">
+      ${planHead({ planId: 'premium', eyebrow: 'Tu plan', title: 'Tu plan personalizado' })}
       <p class="muted">Tu Premium no está activo. Reactívalo para seguir con tu plan o elige un plan gratuito.</p>
-      <button class="btn primary big" data-route="premium">Ver Premium</button>
-      <button class="link plan-leave" data-action="leave-plan">Dejar el plan</button>
+      <button class="btn primary big" data-route="premium">${icon('crown', { size: 20 })}Ver Premium</button>
+      <div class="plan-active-links">
+        <button class="link plan-leave" data-action="leave-plan">Dejar el plan</button>
+      </div>
     </section>`;
 }
 
@@ -198,29 +262,18 @@ function activePlanCard(ctx, plan, planState) {
 
   const progress = planProgress(plan, planState);
   const next = nextPlanSession(plan, planState);
-  const weekText = `Semana ${progress.currentWeek} de ${plan.weeks}`;
   const equipment = premium ? next?.equipment ?? plan.equipment ?? [] : [];
 
   return `
-    <section class="card plan-active${premium ? ' plan-premium' : ''}">
-      <div class="plan-head">
-        <span class="plan-icon${premium ? ' prem-icon' : ''}" aria-hidden="true">${escapeHtml(plan.icon ?? '📋')}</span>
-        <div class="plan-head-text">
-          <span class="label">Tu plan</span>
-          <h2>${escapeHtml(plan.name)}</h2>
-        </div>
-      </div>
-      <div class="plan-progress-line">
-        <strong>${weekText}</strong>
-        <span class="muted">${progress.done}/${progress.total} sesiones</span>
-      </div>
-      ${progressBar(progress.pct, `${plan.name}: ${progress.done} de ${progress.total} sesiones`)}
+    <section class="card plan-active" aria-labelledby="plan-active-title">
+      ${planHead({ planId: plan.id, eyebrow: premium ? 'Tu plan · Premium' : 'Tu plan', title: escapeHtml(plan.name), id: 'plan-active-title' })}
+      ${planProgressBlock(plan, progress, `${plan.name}: ${progress.done} de ${progress.total} sesiones`)}
       ${next ? `
+        ${nextSessionBlock(plan, next, equipment)}
         <button class="btn primary big plan-start" data-action="start-next">
-          ▶ Empezar sesión ${sessionNumber(plan, next)}: ${escapeHtml(focusLabel(next))}
-        </button>
-        <p class="hint center">≈ ${next.minutes} min · ${escapeHtml(levelLabel(next.level))} · ${escapeHtml(equipmentText(equipment))}</p>`
-        : '<p class="plan-finished">🎉 ¡Has completado todas las sesiones!</p>'}
+          ${icon('play', { size: 20 })}<span>Empezar sesión ${sessionNumber(plan, next)}</span>
+        </button>`
+        : planDone('¡Has completado todas las sesiones!')}
       <div class="plan-active-links">
         ${premium ? '<button class="link" data-route="premium">Ver mi plan completo</button>' : ''}
         <button class="link plan-leave" data-action="leave-plan">Dejar el plan</button>
@@ -232,54 +285,57 @@ function planCard(plan, planState) {
   const active = planState.planId === plan.id;
   const finished = isFinished(planState, plan.id);
   const total = plan.weeks * plan.sessionsPerWeek;
-  let action;
-  if (active) action = '<span class="plan-badge">En curso</span>';
-  else {
-    action = `<button class="btn plan-card-btn" data-action="start-plan" data-id="${escapeHtml(plan.id)}">${finished ? 'Repetir plan' : 'Empezar plan'}</button>`;
-  }
+  const action = active
+    ? `<span class="plan-badge">${icon('play', { size: 14 })}En curso</span>`
+    : `<button class="btn plan-card-btn" data-action="start-plan" data-id="${escapeHtml(plan.id)}">${finished ? 'Repetir plan' : 'Empezar plan'}</button>`;
   return `
-    <article class="card plan-card${active ? ' is-active' : ''}">
-      <div class="plan-head">
-        <span class="plan-icon" aria-hidden="true">${escapeHtml(plan.icon)}</span>
-        <div class="plan-head-text">
-          <h3>${escapeHtml(plan.name)}</h3>
-          <span class="plan-meta">${plan.weeks} semanas · ${plan.sessionsPerWeek} × semana · ${plan.minutes} min · ${escapeHtml(levelLabel(plan.level))}</span>
-        </div>
-      </div>
+    <li class="card plan-card${active ? ' is-active' : ''}">
+      ${planHead({
+        planId: plan.id,
+        title: escapeHtml(plan.name),
+        level: 'h3',
+        // Espacio fino irrompible antes de cada "·": al partirse la línea, el punto nunca la empieza.
+        meta: [`${plan.weeks} semanas`, `${plan.sessionsPerWeek} sesiones/semana`, `${plan.minutes} min`, escapeHtml(levelLabel(plan.level))].join('&nbsp;· '),
+      })}
       <p class="plan-desc">${escapeHtml(plan.description)}</p>
       <div class="plan-card-foot">
-        <span class="plan-card-info">
-          ${finished ? '<span class="plan-done">✓ Completado</span>' : `<span class="muted">${total} sesiones</span>`}
-        </span>
+        ${finished
+          ? `<span class="plan-done">${icon('check', { size: 16 })}Completado</span>`
+          : `<span class="muted">${total} sesiones</span>`}
         ${action}
       </div>
-    </article>`;
+    </li>`;
 }
 
-function catalog(planState, activePlan) {
+function catalog(planState) {
   return `
     <section class="train-section" aria-labelledby="train-plans-title">
       <div class="train-section-head">
         <h2 id="train-plans-title">Planes gratuitos</h2>
         <span class="muted">${PLANS.length} planes</span>
       </div>
-      ${activePlan ? '' : '<p class="muted train-section-sub">Elige uno y te guiamos sesión a sesión.</p>'}
-      <div class="plan-list">
+      <p class="muted train-section-sub">Elige uno y te guiamos sesión a sesión. Cada sesión que termines se publica en tu muro.</p>
+      <ul class="plan-list">
         ${PLANS.map((p) => planCard(p, planState)).join('')}
-      </div>
+      </ul>
     </section>`;
 }
 
-function quickSession(ctx) {
+function quickSession(ctx, { primary }) {
   const quick = (ctx.cache.quick ??= { ...DEFAULT_QUICK });
   const level = LEVELS[ctx.me?.level] ? Number(ctx.me.level) : 2;
   const { work, rest } = LEVELS[level];
   return `
     <section class="card train-quick" aria-labelledby="train-quick-title">
-      <h2 id="train-quick-title">⚡ Sesión rápida</h2>
-      <p class="muted">Sin plan y sin material: elige objetivo y tiempo, y a moverte.</p>
+      <div class="train-quick-head">
+        <span class="plan-icon" aria-hidden="true">${icon('bolt', { size: 22 })}</span>
+        <div>
+          <h2 id="train-quick-title">Sesión rápida</h2>
+          <p class="muted">Sin plan y sin material: elige objetivo y tiempo, y a moverte.</p>
+        </div>
+      </div>
       <form class="train-quick-form" data-submit="quick" data-change="quick-change">
-        <fieldset class="field">
+        <fieldset class="train-fieldset">
           <legend class="field-label">Objetivo</legend>
           <div class="chips">
             ${Object.entries(FOCUSES).map(([key, f]) => `
@@ -290,7 +346,7 @@ function quickSession(ctx) {
           </div>
           <p class="hint" id="train-focus-hint">${escapeHtml(FOCUSES[quick.focus]?.description ?? '')}</p>
         </fieldset>
-        <fieldset class="field">
+        <fieldset class="train-fieldset">
           <legend class="field-label">Duración</legend>
           <div class="segmented">
             ${QUICK_MINUTES.map((m) => `
@@ -300,8 +356,8 @@ function quickSession(ctx) {
               </label>`).join('')}
           </div>
         </fieldset>
-        <button class="btn primary big" type="submit">▶ Empezar sesión rápida</button>
-        <p class="hint center">${escapeHtml(levelLabel(level))} · ${work}s de trabajo y ${rest}s de descanso</p>
+        <button class="btn big${primary ? ' primary' : ''}" type="submit">${icon('play', { size: 20 })}Empezar sesión rápida</button>
+        <p class="hint center">${escapeHtml(levelLabel(level))} · ${work} s de trabajo y ${rest} s de descanso</p>
       </form>
     </section>`;
 }
@@ -309,12 +365,12 @@ function quickSession(ctx) {
 function libraryLink() {
   return `
     <button class="card train-link" data-route="ejercicios">
-      <span class="train-link-icon" aria-hidden="true">📚</span>
+      <span class="plan-icon" aria-hidden="true">${icon('list', { size: 22 })}</span>
       <span class="train-link-body">
         <strong>Biblioteca de ejercicios</strong>
         <span class="muted">${EXERCISES.length} ejercicios explicados para pádel</span>
       </span>
-      <span class="train-link-go" aria-hidden="true">›</span>
+      <span class="train-link-go" aria-hidden="true">${icon('chevron', { size: 20 })}</span>
     </button>`;
 }
 
@@ -348,14 +404,10 @@ export default {
     ctx.cache.data = { planState, activePlan };
 
     return `
-      <header class="train-head">
-        <h1>Entrenar</h1>
-        <p class="muted">Físico específico para pádel. Cada sesión que termines se publica en tu muro.</p>
-      </header>
       ${premiumCard(ctx, { answers, premiumPlan, planState, activePlan })}
       ${activePlanCard(ctx, activePlan, planState)}
-      ${catalog(planState, activePlan)}
-      ${quickSession(ctx)}
+      ${catalog(planState)}
+      ${quickSession(ctx, { primary: !activePlan })}
       ${libraryLink()}`;
   },
 

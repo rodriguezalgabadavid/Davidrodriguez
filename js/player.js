@@ -1,5 +1,6 @@
 import { getExercise } from './data.js';
 import { buildTimeline, formatTime, timelineDuration } from './generator.js';
+import { icon } from './icons.js';
 import { askConfirm, escapeHtml } from './ui.js';
 
 // Reproductor a pantalla completa de una sesión de preparación física (temporizador de intervalos).
@@ -146,31 +147,32 @@ function renderPlayer() {
   const showSwitch = ex?.sides && player.sideSwitched;
 
   $player.className = `player ${isWork ? 'work' : 'rest'}`;
+  const phase = isWork ? (showSwitch ? '¡Cambia de lado!' : 'Trabajo') : step.label || 'Descanso';
   $player.innerHTML = `
     <div class="player-top">
-      <button class="icon-btn" data-player="close" aria-label="Salir">✕</button>
+      <button class="icon-btn" data-player="close" aria-label="Salir">${icon('close', { size: 22 })}</button>
       <div class="player-meta">
-        <span>${escapeHtml(step.block)}</span>
+        <span class="player-block">${escapeHtml(step.block)}</span>
         ${step.rounds > 1 ? `<span>Ronda ${step.round}/${step.rounds}</span>` : ''}
       </div>
-      <span class="muted-light">${formatTime(total - elapsedSeconds())}</span>
+      <span class="player-left">${icon('clock', { size: 16 })}<span class="sr-only">Quedan </span><span>${formatTime(total - elapsedSeconds())}</span></span>
     </div>
     <div class="progress thin"><div style="width:${progress}%"></div></div>
 
     <div class="player-main">
-      <span class="phase">${isWork ? (showSwitch ? '¡Cambia de lado!' : 'Trabajo') : escapeHtml(step.label || 'Descanso')}</span>
-      <h1>${isWork ? escapeHtml(ex.name) : upcomingEx ? `Siguiente: ${escapeHtml(upcomingEx.name)}` : 'Último esfuerzo'}</h1>
+      <span class="phase${showSwitch ? ' switch' : ''}">${escapeHtml(phase)}</span>
+      <h2 class="player-title">${isWork ? escapeHtml(ex.name) : upcomingEx ? `Siguiente: ${escapeHtml(upcomingEx.name)}` : 'Último esfuerzo'}</h2>
       <div class="ring" style="--p:${stepPct}">
         <span class="clock">${formatTime(player.remaining)}</span>
       </div>
       <p class="player-desc">${escapeHtml((isWork ? ex : upcomingEx)?.description ?? '')}</p>
-      ${isWork && upcomingEx ? `<p class="player-next">Después: ${escapeHtml(upcomingEx.name)}</p>` : ''}
+      ${isWork && upcomingEx ? `<p class="player-next">${icon('next', { size: 16 })}<span>Después: ${escapeHtml(upcomingEx.name)}</span></p>` : ''}
     </div>
 
     <div class="player-controls">
-      <button class="icon-btn" data-player="prev" aria-label="Anterior" ${player.index === 0 ? 'disabled' : ''}>⏮</button>
-      <button class="icon-btn play" data-player="toggle" aria-label="${player.running ? 'Pausar' : 'Reanudar'}">${player.running ? '⏸' : '▶'}</button>
-      <button class="icon-btn" data-player="next" aria-label="Siguiente">⏭</button>
+      <button class="icon-btn" data-player="prev" aria-label="Anterior" ${player.index === 0 ? 'disabled' : ''}>${icon('prev', { size: 24 })}</button>
+      <button class="icon-btn play" data-player="toggle" aria-label="${player.running ? 'Pausar' : 'Reanudar'}">${icon(player.running ? 'pause' : 'play', { size: 34 })}</button>
+      <button class="icon-btn" data-player="next" aria-label="Siguiente">${icon('next', { size: 24 })}</button>
     </div>`;
 }
 
@@ -183,15 +185,20 @@ function finishPlayer() {
   player.completedSeconds = seconds;
   $player.className = 'player finish';
   $player.innerHTML = `
-    <div class="player-main">
+    <div class="player-main player-finish">
+      <span class="player-medal" aria-hidden="true">${icon('medal', { size: 40 })}</span>
       <span class="phase">Sesión completada</span>
-      <h1>¡Gran trabajo! 🎾</h1>
-      <p class="player-desc">${escapeHtml(player.session.title)} · ${formatTime(seconds)} de entrenamiento</p>
-      <div class="field">
-        <label for="rpe">¿Cómo de dura ha sido? <strong id="rpe-value">6</strong>/10</label>
-        <input id="rpe" type="range" min="1" max="10" value="6" />
+      <h2 class="player-title">¡Gran trabajo!</h2>
+      <dl class="player-stats">
+        <div><dt>Sesión</dt><dd>${escapeHtml(player.session.title)}</dd></div>
+        <div><dt>Tiempo</dt><dd class="player-stat-num">${formatTime(seconds)}</dd></div>
+      </dl>
+      <div class="field player-rpe">
+        <label for="rpe">¿Cómo de dura ha sido? <strong><span id="rpe-value">6</span>/10</strong></label>
+        <input id="rpe" type="range" min="1" max="10" value="6" aria-describedby="rpe-scale" />
+        <span class="player-rpe-scale" id="rpe-scale"><span>1 · Muy suave</span><span>10 · Al límite</span></span>
       </div>
-      <button class="btn primary big" data-player="save">Guardar sesión</button>
+      <button class="btn primary big" data-player="save">${icon('check', { size: 20 })}Guardar sesión</button>
     </div>`;
   $player.querySelector('#rpe').addEventListener('input', (e) => {
     $player.querySelector('#rpe-value').textContent = e.target.value;

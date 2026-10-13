@@ -65,7 +65,7 @@ function heroHtml() {
         <p class="onb-lead">Tus partidos, tus retos y tu físico, con tus amigos de pista.</p>
         <ul class="onb-props">
           ${PROPS.map(([name, title, text]) => `
-            <li>
+            <li class="onb-prop">
               <span class="onb-prop-icon">${icon(name, { size: 22 })}</span>
               <span class="onb-prop-text"><strong>${title}</strong> <span>${text}</span></span>
             </li>`).join('')}
@@ -180,14 +180,15 @@ function profileStepHtml() {
 
 // ---------- Seguir jugadores (paso 2) ----------
 
+// Dos líneas cortas de detalle en gris, como en las listas de Strava: cómo juega (nivel · posición) y
+// dónde (su club; si no tiene, cuántos le siguen).
 function playerMeta(p) {
-  const parts = [];
-  if (LEVELS[p.level]) parts.push(LEVELS[p.level].label);
-  if (POSITIONS[p.position]) parts.push(POSITIONS[p.position]);
-  if (p.club) parts.push(p.club);
+  const game = [];
+  if (LEVELS[p.level]) game.push(LEVELS[p.level].label);
+  if (POSITIONS[p.position]) game.push(POSITIONS[p.position]);
   const followers = Number(p.followersCount) || 0;
-  if (followers) parts.push(`${followers} ${plural(followers, 'seguidor', 'seguidores')}`);
-  return parts.join(' · ');
+  const place = p.club || (followers ? `${followers} ${plural(followers, 'seguidor', 'seguidores')}` : '');
+  return [game.join(' · '), place].filter(Boolean);
 }
 
 // Botón conmutable: "Seguir" (borde azul) ↔ "Siguiendo" (gris, con marca) y aria-pressed. La única acción
@@ -213,7 +214,7 @@ function playerRow(p) {
           <span class="onb-player-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
           ${premiumBadge(p) || demoTag(p) ? `<span class="onb-player-tags">${premiumBadge(p)}${demoTag(p)}</span>` : ''}
         </span>
-        ${meta ? `<span class="onb-player-meta">${escapeHtml(meta)}</span>` : ''}
+        ${meta.map((line) => `<span class="onb-player-meta">${escapeHtml(line)}</span>`).join('')}
       </span>
       ${pickButton(p)}
     </li>`;

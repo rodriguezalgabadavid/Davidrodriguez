@@ -4,6 +4,8 @@
 
 App web (PWA) sin paso de compilación ni dependencias: HTML, módulos ES y CSS. Se instala en el móvil desde el navegador.
 
+**Diseño**: la esencia de Strava llevada al pádel. Azul de pista como color de marca, amarillo bola para lo que se celebra, tipografía Barlow (alojada en la app) e iconos propios. Contraste AA en modo claro y oscuro, y auditoría automática WCAG 2.1 AA sin incidencias. Detalles en [docs/DESIGN.md](docs/DESIGN.md).
+
 ## Qué tiene
 
 - **Muro social**: tus actividades y las de la gente que sigues, con resultado, foto, texto, "¡Vamos!" y comentarios. Sugerencias de jugadores a los que seguir.
@@ -48,6 +50,7 @@ supabase/migrations/       Esquema SQL con RLS, triggers de notificaciones y Sto
 supabase/functions/        Webhook de Stripe (Edge Function)
 docs/ARCHITECTURE.md       Contratos entre módulos: vistas, backend, modelos y esquema
 docs/SETUP.md              Cómo poner en marcha Supabase, Stripe y GitHub Pages
+docs/DESIGN.md             Guía de diseño: identidad, tipografía, componentes y accesibilidad
 tests/                     Tests (node --test)
 ```
 

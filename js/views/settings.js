@@ -1,6 +1,7 @@
 import { POSITIONS } from '../activities.js';
 import { CONFIG } from '../config.js';
 import { LEVELS } from '../data.js';
+import { icon } from '../icons.js';
 import { askConfirm, escapeHtml, premiumBadge, toast } from '../ui.js';
 
 // Ajustes: editar el perfil, preferencias del dispositivo, suscripción y cuenta.
@@ -19,7 +20,7 @@ const clampGoal = (n) => Math.min(GOAL_MAX, Math.max(GOAL_MIN, Math.round(Number
 
 function segmented(name, options, selected, label) {
   return `
-    <fieldset class="field">
+    <fieldset class="field set-fieldset">
       <legend class="field-label">${label}</legend>
       <div class="segmented set-segmented">
         ${options.map(([value, text]) => `
@@ -31,34 +32,39 @@ function segmented(name, options, selected, label) {
     </fieldset>`;
 }
 
+// Título de grupo al estilo de los ajustes de iOS / Strava: etiqueta pequeña en mayúsculas sobre la tarjeta.
+const groupTitle = (id, text) => `<h2 class="label set-group-title" id="${id}">${text}</h2>`;
+
 function profileForm(p) {
   const bio = p?.bio ?? '';
   const levels = Object.entries(LEVELS).map(([value, l]) => [value, l.label]);
   // "Los dos" se guarda como sin posición (null).
   const positions = [...Object.entries(POSITIONS), ['', 'Los dos']];
   return `
-    <form class="card set-card" data-submit="save-profile" autocomplete="off">
-      <h2>Tu perfil</h2>
-      <div class="field">
-        <label class="field-label" for="set-name">Nombre</label>
-        <input class="input" id="set-name" name="name" value="${escapeHtml(p?.name ?? '')}" maxlength="${NAME_MAX}"
-          required autocomplete="name" autocapitalize="words" placeholder="Cómo te verán tus amigos" />
-      </div>
-      ${segmented('level', levels, p?.level ?? 2, 'Nivel')}
-      ${segmented('position', positions, p?.position ?? '', 'Juegas de…')}
-      <div class="field">
-        <label class="field-label" for="set-club">Club <span class="muted">(opcional)</span></label>
-        <input class="input" id="set-club" name="club" value="${escapeHtml(p?.club ?? '')}" maxlength="${CLUB_MAX}"
-          placeholder="Dónde sueles jugar" />
-      </div>
-      <div class="field">
-        <label class="field-label" for="set-bio">Sobre ti <span class="muted">(opcional)</span></label>
-        <textarea class="input" id="set-bio" name="bio" rows="3" maxlength="${BIO_MAX}" data-input="bio-count"
-          placeholder="Cuándo juegas, qué buscas, tu golpe favorito…" aria-describedby="set-bio-hint">${escapeHtml(bio)}</textarea>
-        <p class="hint set-counter" id="set-bio-hint"><span id="set-bio-count">${bio.length}</span>/${BIO_MAX}</p>
-      </div>
-      <button class="btn primary big" type="submit">Guardar cambios</button>
-    </form>`;
+    <section class="set-group" aria-labelledby="set-profile-title">
+      ${groupTitle('set-profile-title', 'Perfil')}
+      <form class="card set-card set-form" data-submit="save-profile" autocomplete="off">
+        <div class="field">
+          <label class="field-label" for="set-name">Nombre</label>
+          <input class="input" id="set-name" name="name" value="${escapeHtml(p?.name ?? '')}" maxlength="${NAME_MAX}"
+            required autocomplete="name" autocapitalize="words" placeholder="Cómo te verán tus amigos" />
+        </div>
+        ${segmented('level', levels, p?.level ?? 2, 'Nivel')}
+        ${segmented('position', positions, p?.position ?? '', 'Juegas de…')}
+        <div class="field">
+          <label class="field-label" for="set-club">Club <span class="set-optional">(opcional)</span></label>
+          <input class="input" id="set-club" name="club" value="${escapeHtml(p?.club ?? '')}" maxlength="${CLUB_MAX}"
+            placeholder="Dónde sueles jugar" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="set-bio">Sobre ti <span class="set-optional">(opcional)</span></label>
+          <textarea class="input" id="set-bio" name="bio" rows="3" maxlength="${BIO_MAX}" data-input="bio-count"
+            placeholder="Cuándo juegas, qué buscas, tu golpe favorito…" aria-describedby="set-bio-hint">${escapeHtml(bio)}</textarea>
+          <p class="hint set-counter" id="set-bio-hint"><span id="set-bio-count">${bio.length}</span>/${BIO_MAX} caracteres</p>
+        </div>
+        <button class="btn primary big" type="submit">Guardar cambios</button>
+      </form>
+    </section>`;
 }
 
 // ---------- Preferencias ----------
@@ -66,24 +72,28 @@ function profileForm(p) {
 function preferences(settings) {
   const goal = clampGoal(settings?.weeklyGoal);
   return `
-    <section class="card set-card" aria-labelledby="set-prefs-title">
-      <h2 id="set-prefs-title">Preferencias</h2>
-      <label class="set-row">
-        <span class="set-row-text">
-          <strong>Sonido y vibración</strong>
-          <span class="muted">Avisos del temporizador al entrenar</span>
-        </span>
-        <input class="set-switch" type="checkbox" role="switch" data-change="sound" ${settings?.sound ? 'checked' : ''} />
-      </label>
-      <div class="set-row">
-        <span class="set-row-text">
-          <strong>Objetivo semanal</strong>
-          <span class="muted">Actividades por semana. Lo verás en tu racha.</span>
-        </span>
-        <div class="set-stepper" role="group" aria-label="Objetivo semanal">
-          <button class="set-step" type="button" data-action="goal" data-delta="-1" aria-label="Una menos" ${goal <= GOAL_MIN ? 'disabled' : ''}>−</button>
-          <output class="set-goal" id="set-goal" aria-live="polite">${goal}</output>
-          <button class="set-step" type="button" data-action="goal" data-delta="1" aria-label="Una más" ${goal >= GOAL_MAX ? 'disabled' : ''}>+</button>
+    <section class="set-group" aria-labelledby="set-prefs-title">
+      ${groupTitle('set-prefs-title', 'Preferencias')}
+      <div class="card set-list">
+        <label class="set-row set-row-tap">
+          <span class="set-row-icon" aria-hidden="true">${icon('bell', { size: 20 })}</span>
+          <span class="set-row-text">
+            <strong>Sonido y vibración</strong>
+            <span class="set-row-sub">Avisos del temporizador al entrenar</span>
+          </span>
+          <input class="set-switch" type="checkbox" role="switch" data-change="sound" ${settings?.sound ? 'checked' : ''} />
+        </label>
+        <div class="set-row">
+          <span class="set-row-icon" aria-hidden="true">${icon('target', { size: 20 })}</span>
+          <span class="set-row-text" id="set-goal-label">
+            <strong>Objetivo semanal</strong>
+            <span class="set-row-sub">Actividades por semana. Lo verás en tu perfil.</span>
+          </span>
+          <div class="set-stepper" role="group" aria-labelledby="set-goal-label">
+            <button class="set-step" type="button" data-action="goal" data-delta="-1" aria-label="Una menos" ${goal <= GOAL_MIN ? 'disabled' : ''}>−</button>
+            <output class="set-goal" id="set-goal" aria-live="polite">${goal}</output>
+            <button class="set-step" type="button" data-action="goal" data-delta="1" aria-label="Una más" ${goal >= GOAL_MAX ? 'disabled' : ''}>+</button>
+          </div>
         </div>
       </div>
     </section>`;
@@ -98,69 +108,86 @@ function renewalHint(sub) {
   return 'Se renueva sola cada mes. Puedes cancelarla cuando quieras.';
 }
 
+// Cabecera de la tarjeta de suscripción: plan y estado escrito (no solo con color).
+function subHead(plan, status, tone) {
+  return `
+    <div class="set-sub-head">
+      <span class="set-sub-icon ${tone}" aria-hidden="true">${icon('crown', { size: 22 })}</span>
+      <span class="set-row-text">
+        <strong class="set-sub-plan">${plan}</strong>
+        <span class="set-sub-status ${tone}">${status}</span>
+      </span>
+    </div>`;
+}
+
 function subscriptionBlock(sub, demo) {
+  let body;
   if (!sub) {
-    return `
-      <section class="card set-card" aria-labelledby="set-sub-title">
-        <h2 id="set-sub-title">Suscripción</h2>
-        <p class="muted">No se ha podido cargar tu suscripción.</p>
+    body = `
+      <div class="card set-card set-sub">
+        <p class="set-text">No se ha podido cargar tu suscripción.</p>
         <button class="btn" data-action="retry">Reintentar</button>
-      </section>`;
-  }
-  if (sub.active) {
+      </div>`;
+  } else if (sub.active) {
     const until = sub.renewsAt ? dateFmt.format(new Date(sub.renewsAt)) : '';
-    return `
-      <section class="card set-card set-sub set-sub-on" aria-labelledby="set-sub-title">
-        <h2 id="set-sub-title">Suscripción</h2>
-        <p class="set-sub-status">${premiumBadge({ isPremium: true })} Premium activo${until ? ` hasta el ${escapeHtml(until)}` : ''}</p>
-        <p class="hint">${escapeHtml(renewalHint(sub))}</p>
+    body = `
+      <div class="card set-card set-sub">
+        ${subHead(`Premium ${premiumBadge({ isPremium: true })}`, `Activo${until ? ` hasta el ${escapeHtml(until)}` : ''}`, 'on')}
+        <p class="set-text">${escapeHtml(renewalHint(sub))}</p>
         <button class="btn" data-action="manage-subscription">Gestionar suscripción</button>
-      </section>`;
-  }
-  if (sub.manageable) {
+      </div>`;
+  } else if (sub.manageable) {
     // Suscripción en Stripe sin Premium activo (cobro pendiente): se arregla en el portal, no pagando otra.
-    return `
-      <section class="card set-card set-sub" aria-labelledby="set-sub-title">
-        <h2 id="set-sub-title">Suscripción</h2>
-        <p class="set-sub-status">Premium en pausa</p>
-        <p class="muted">Hay un problema con el cobro de tu suscripción. Revisa tu método de pago para recuperar Premium.</p>
+    body = `
+      <div class="card set-card set-sub">
+        ${subHead('Premium', 'En pausa: cobro pendiente', 'warn')}
+        <p class="set-text">Hay un problema con el cobro de tu suscripción. Revisa tu método de pago para recuperar Premium.</p>
         <button class="btn primary" data-action="manage-subscription">Gestionar suscripción</button>
-      </section>`;
+      </div>`;
+  } else {
+    body = `
+      <div class="card set-card set-sub">
+        ${subHead('Plan gratuito', 'Sin Premium', 'off')}
+        <p class="set-text">Con Premium tienes un plan de físico hecho para tu juego por <strong>${escapeHtml(CONFIG.premiumPrice)}/${escapeHtml(CONFIG.premiumPeriod)}</strong>.</p>
+        ${demo ? `<p class="set-note">${icon('info', { size: 18 })}<span>En la demo el pago es simulado: no se cobra nada.</span></p>` : ''}
+        <button class="btn accent" data-route="premium">${icon('crown', { size: 20 })}<span>Ver Premium</span></button>
+      </div>`;
   }
   return `
-    <section class="card set-card set-sub" aria-labelledby="set-sub-title">
-      <h2 id="set-sub-title">Suscripción</h2>
-      <p class="set-sub-status">Plan gratuito</p>
-      <p class="muted">Con Premium tienes un plan de físico hecho para tu juego por ${escapeHtml(CONFIG.premiumPrice)}/${escapeHtml(CONFIG.premiumPeriod)}.</p>
-      ${demo ? '<p class="hint">En la demo el pago es simulado: no se cobra nada.</p>' : ''}
-      <button class="btn primary" data-route="premium">Ver Premium</button>
+    <section class="set-group" aria-labelledby="set-sub-title">
+      ${groupTitle('set-sub-title', 'Suscripción')}
+      ${body}
     </section>`;
 }
 
 // ---------- Cuenta y privacidad ----------
 
 function accountBlock(demo) {
-  if (demo) {
-    return `
-      <section class="card set-card" aria-labelledby="set-account-title">
-        <h2 id="set-account-title">Cuenta</h2>
-        <p class="muted">Estás en modo demo: tu cuenta, la comunidad de ejemplo y el pago son simulados y solo se guardan en este dispositivo.</p>
-        <button class="btn danger set-danger" data-action="reset-demo">Reiniciar demo</button>
-      </section>`;
-  }
+  const body = demo
+    ? `
+      <div class="card set-card">
+        <p class="set-note">${icon('info', { size: 18 })}<span>Estás en modo demo: tu cuenta, la comunidad de ejemplo y el pago son simulados y solo se guardan en este dispositivo.</span></p>
+        <button class="btn danger set-danger" data-action="reset-demo">${icon('trash', { size: 20 })}<span>Reiniciar demo</span></button>
+      </div>`
+    : `
+      <div class="card set-card">
+        <button class="btn danger set-danger" data-action="sign-out">${icon('logout', { size: 20 })}<span>Cerrar sesión</span></button>
+      </div>`;
   return `
-    <section class="card set-card" aria-labelledby="set-account-title">
-      <h2 id="set-account-title">Cuenta</h2>
-      <button class="btn set-danger" data-action="sign-out">Cerrar sesión</button>
+    <section class="set-group" aria-labelledby="set-account-title">
+      ${groupTitle('set-account-title', 'Cuenta')}
+      ${body}
     </section>`;
 }
 
 function privacyNote(demo) {
   return `
-    <section class="set-privacy" aria-labelledby="set-privacy-title">
-      <h2 id="set-privacy-title">Privacidad</h2>
-      <p class="muted">Lo que publicas lo pueden ver los usuarios de PadelFit. Las fotos se guardan como enlaces públicos: no subas nada que no quieras compartir.</p>
-      ${demo ? '<p class="muted">En la demo, todo se queda en este dispositivo.</p>' : ''}
+    <section class="set-group" aria-labelledby="set-privacy-title">
+      ${groupTitle('set-privacy-title', 'Privacidad')}
+      <div class="card set-card set-privacy">
+        <p class="set-text">Lo que publicas lo pueden ver los usuarios de PadelFit. Las fotos se guardan como enlaces públicos: no subas nada que no quieras compartir.</p>
+        ${demo ? '<p class="set-text">En la demo, todo se queda en este dispositivo.</p>' : ''}
+      </div>
     </section>`;
 }
 
@@ -179,8 +206,6 @@ export default {
     const demo = backend.mode === 'demo';
     return `
       <section class="set-view">
-        <button class="link set-back" data-route="perfil">← Tu perfil</button>
-        <h1 class="set-heading">Ajustes</h1>
         ${profileForm(me ?? ctx.me)}
         ${preferences(ctx.settings)}
         ${subscriptionBlock(sub, demo)}

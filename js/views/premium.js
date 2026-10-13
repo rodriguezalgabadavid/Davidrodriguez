@@ -10,25 +10,29 @@ import {
   planSessions,
   sessionForPlan,
 } from '../plans.js';
+import { icon } from '../icons.js';
 import { escapeHtml, toast } from '../ui.js';
 import {
   confirmThen,
-  equipmentText,
+  courtLines,
   focusLabel,
   levelLabel,
+  nextSessionBlock,
+  planDone,
+  planHead,
+  planProgressBlock,
   playSession,
-  progressBar,
   sessionNumber,
 } from './train.js';
 
 // Premium: sin suscripción → paywall honesto; con suscripción → cuestionario y plan personalizado.
 
 const BENEFITS = [
-  { icon: '📅', title: 'Plan de 4 semanas para ti', text: 'Según tu nivel, los días que puedes entrenar y el material que tienes.' },
-  { icon: '🎾', title: 'Se adapta a tus partidos', text: 'Si juegas mucho o tu carga de la semana está alta, ajusta el volumen para que llegues fresco.' },
-  { icon: '🩹', title: 'Cuida tus molestias', text: 'Trabajo específico para hombro, codo, rodilla, espalda o tobillo.' },
-  { icon: '⏱️', title: 'Sesiones guiadas', text: 'Temporizador con cada ejercicio explicado: solo tienes que seguirlo.' },
-  { icon: '🏅', title: 'Insignia PRO en tu perfil', text: 'Que se note que vas en serio.', badge: true },
+  { icon: 'calendar', title: 'Plan de 4 semanas para ti', text: 'Según tu nivel, los días que puedes entrenar y el material que tienes.' },
+  { icon: 'ball', title: 'Se adapta a tus partidos', text: 'Si juegas mucho o tu carga de la semana está alta, ajusta el volumen para que llegues fresco.' },
+  { icon: 'target', title: 'Cuida tus molestias', text: 'Trabajo específico para hombro, codo, rodilla, espalda o tobillo.' },
+  { icon: 'clock', title: 'Sesiones guiadas', text: 'Temporizador con cada ejercicio explicado: solo tienes que seguirlo.' },
+  { icon: 'medal', title: 'Insignia PRO en tu perfil', text: 'Que se note que vas en serio.', badge: true },
 ];
 
 const dateFmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long' });
@@ -61,53 +65,56 @@ function setBusy(button, label) {
 
 // ---------- Paywall ----------
 
+// Cabecera azul de pista con la corona (paywall y estados de la suscripción).
+function hero(inner, attrs = '') {
+  return `
+    <section class="prem-hero"${attrs}>
+      ${courtLines()}
+      <span class="prem-crown prem-crown-lg" aria-hidden="true">${icon('crown', { size: 30 })}</span>
+      ${inner}
+    </section>`;
+}
+
 // Vuelta de Stripe: el pago está hecho pero el webhook puede tardar unos segundos en activar Premium.
 function activating({ timedOut = false } = {}) {
-  return `
-    <button class="link back" data-route="entrenar">← Entrenar</button>
-    <section class="prem-hero" aria-live="polite">
-      <span class="prem-crown prem-crown-lg" aria-hidden="true">👑</span>
-      <h1>${timedOut ? 'Tu pago se está procesando' : 'Activando tu Premium…'}</h1>
-      <p class="prem-lead">${timedOut
-        ? 'Stripe aún no nos ha confirmado el pago. Suele tardar segundos; si en unos minutos no se activa, escríbenos y lo revisamos. No vuelvas a pagar.'
-        : 'Gracias por tu pago. Lo estamos confirmando con Stripe; tarda solo unos segundos.'}</p>
-      ${timedOut ? '<button class="btn primary big" data-action="check-again">Comprobar de nuevo</button>' : '<div class="loading"><span class="spinner" aria-hidden="true"></span></div>'}
-    </section>`;
+  return hero(`
+    <h2 class="prem-hero-title">${timedOut ? 'Tu pago se está procesando' : 'Activando tu Premium…'}</h2>
+    <p class="prem-lead">${timedOut
+      ? 'Stripe aún no nos ha confirmado el pago. Suele tardar segundos; si en unos minutos no se activa, escríbenos y lo revisamos. No vuelvas a pagar.'
+      : 'Gracias por tu pago. Lo estamos confirmando con Stripe; tarda solo unos segundos.'}</p>
+    ${timedOut
+      ? '<button class="btn accent big prem-cta" data-action="check-again">Comprobar de nuevo</button>'
+      : '<div class="prem-loading" role="status"><span class="prem-spinner" aria-hidden="true"></span><span>Confirmando el pago…</span></div>'}`,
+  ' aria-live="polite"');
 }
 
 // Ya hay una suscripción en Stripe (p. ej. con un cobro pendiente): se gestiona, no se paga otra.
 function existingSubscription() {
-  return `
-    <button class="link back" data-route="entrenar">← Entrenar</button>
-    <section class="prem-hero">
-      <span class="prem-crown prem-crown-lg" aria-hidden="true">👑</span>
-      <h1>Tu suscripción necesita atención</h1>
-      <p class="prem-lead">Ya tienes una suscripción Premium, pero no está activa ahora mismo. Revisa tu método de pago en el portal de Stripe.</p>
-      <button class="btn primary big" data-action="manage">Gestionar suscripción</button>
-    </section>`;
+  return hero(`
+    <h2 class="prem-hero-title">Tu suscripción necesita atención</h2>
+    <p class="prem-lead">Ya tienes una suscripción Premium, pero no está activa ahora mismo. Revisa tu método de pago en el portal de Stripe.</p>
+    <button class="btn accent big prem-cta" data-action="manage">Gestionar suscripción</button>`);
 }
 
 function paywall(ctx) {
   const demo = ctx.backend.mode === 'demo';
   return `
-    <button class="link back" data-route="entrenar">← Entrenar</button>
-    <section class="prem-hero" aria-labelledby="prem-title">
-      <span class="prem-crown prem-crown-lg" aria-hidden="true">👑</span>
+    ${hero(`
       <span class="prem-eyebrow">PadelFit Premium</span>
-      <h1 id="prem-title">Tu preparación física, hecha para ti</h1>
+      <h2 class="prem-hero-title" id="prem-title">Tu preparación física, hecha para ti</h2>
       <p class="prem-lead">Un plan de 4 semanas creado a partir de tu nivel, tus partidos y tus molestias. Y que cambia contigo.</p>
       <p class="prem-price"><strong>${escapeHtml(CONFIG.premiumPrice)}</strong><span>/${escapeHtml(CONFIG.premiumPeriod)}</span></p>
-      <button class="btn primary big prem-cta" data-action="checkout">Hazte Premium</button>
+      <button class="btn accent big prem-cta" data-action="checkout">${icon('crown', { size: 20 })}Hazte Premium</button>
       <p class="prem-small">Cancela cuando quieras. Pago seguro con Stripe.</p>
-      ${demo ? '<p class="prem-demo">Modo demo: no se cobra nada. Puedes activar una prueba de 30 días.</p>' : ''}
-    </section>
+      ${demo ? `<p class="prem-demo">${icon('info', { size: 16 })}<span>Modo demo: no se cobra nada. Puedes activar una prueba de 30 días.</span></p>` : ''}`,
+    ' aria-labelledby="prem-title"')}
 
     <section class="card prem-benefits" aria-labelledby="prem-benefits-title">
       <h2 id="prem-benefits-title">Qué incluye</h2>
       <ul class="prem-list">
         ${BENEFITS.map((b) => `
           <li>
-            <span class="prem-list-icon" aria-hidden="true">${b.icon}</span>
+            <span class="prem-list-icon" aria-hidden="true">${icon(b.icon, { size: 20 })}</span>
             <span class="prem-list-body">
               <strong>${escapeHtml(b.title)}${b.badge ? ' <span class="premium-badge">PRO</span>' : ''}</strong>
               <span class="muted">${escapeHtml(b.text)}</span>
@@ -116,12 +123,16 @@ function paywall(ctx) {
       </ul>
     </section>
 
-    <section class="card prem-free">
-      <h3>Lo de siempre sigue gratis</h3>
-      <p class="muted">Planes generales, sesiones rápidas, retos y toda la parte social.</p>
+    <section class="card prem-free" aria-labelledby="prem-free-title">
+      <span class="prem-free-icon" aria-hidden="true">${icon('check', { size: 20 })}</span>
+      <div>
+        <h3 id="prem-free-title">Lo de siempre sigue gratis</h3>
+        <p class="muted">Planes generales, sesiones rápidas, retos y toda la parte social.</p>
+      </div>
     </section>
 
-    <button class="btn primary big prem-cta" data-action="checkout">Hazte Premium · ${price()}</button>`;
+    <button class="btn primary big" data-action="checkout">Hazte Premium · ${price()}</button>
+    <p class="prem-small-print">Se renueva cada ${escapeHtml(CONFIG.premiumPeriod)} hasta que lo canceles.${demo ? ' En la demo no hay cobros reales.' : ''}</p>`;
 }
 
 // ---------- Cuestionario ----------
@@ -146,18 +157,14 @@ function questionnaire(ctx, answers) {
   const values = initialAnswers(ctx, answers);
   const isEdit = Boolean(answers);
   return `
-    ${isEdit
-      ? '<button class="link back" data-action="cancel-edit">← Mi plan</button>'
-      : '<button class="link back" data-route="entrenar">← Entrenar</button>'}
     <header class="prem-head">
-      <span class="prem-eyebrow">👑 Premium</span>
-      <h1>${isEdit ? 'Edita tus respuestas' : 'Creemos tu plan'}</h1>
+      ${planHead({ planId: 'premium', eyebrow: 'Premium', title: isEdit ? 'Edita tus respuestas' : 'Creemos tu plan' })}
       <p class="muted">${PREMIUM_QUESTIONS.length} preguntas rápidas. ${isEdit ? 'Tu plan se recalcula al guardar.' : 'Puedes cambiarlas cuando quieras.'}</p>
     </header>
     <form class="card prem-quiz" data-submit="save-answers" data-change="quiz-change">
-      ${PREMIUM_QUESTIONS.map((q) => `
+      ${PREMIUM_QUESTIONS.map((q, i) => `
         <fieldset class="prem-q">
-          <legend class="field-label">${escapeHtml(q.label)}</legend>
+          <legend class="field-label"><span class="prem-q-num" aria-hidden="true">${i + 1}</span><span>${escapeHtml(q.label)}</span></legend>
           <div class="chips">
             ${q.options.map((o) => `
               <label class="chip-radio">
@@ -169,8 +176,10 @@ function questionnaire(ctx, answers) {
           ${q.id === 'equipment' ? '<p class="hint">¿Nada? Perfecto: entrenarás con tu propio peso.</p>' : ''}
           ${q.type === 'multi' && q.id !== 'equipment' ? '<p class="hint">Puedes marcar varias.</p>' : ''}
         </fieldset>`).join('')}
-      <button class="btn primary big" type="submit">${isEdit ? 'Guardar y actualizar mi plan' : 'Crear mi plan'}</button>
-      ${isEdit ? '<button class="btn big" type="button" data-action="cancel-edit">Cancelar</button>' : ''}
+      <div class="prem-quiz-actions">
+        <button class="btn primary big" type="submit">${isEdit ? 'Guardar y actualizar mi plan' : 'Crear mi plan'}</button>
+        ${isEdit ? '<button class="btn big" type="button" data-action="cancel-edit">Cancelar</button>' : ''}
+      </div>
     </form>`;
 }
 
@@ -203,9 +212,14 @@ function subscriptionText(subscription) {
 function weekCard(plan, week, { completed, next, active, currentWeek, allDone }) {
   const sessions = planSessions(plan).filter((s) => s.week === week);
   const now = active && week === currentWeek;
+  const doneCount = sessions.filter((s) => allDone || completed[s.key]).length;
   return `
-    <section class="card plan-week${now ? ' is-current' : ''}" aria-label="Semana ${week}">
-      <h3 class="plan-week-title">Semana ${week}${now ? ' <span class="plan-badge">Ahora</span>' : ''}</h3>
+    <section class="card plan-week${now ? ' is-current' : ''}" aria-labelledby="plan-week-${week}">
+      <div class="plan-week-head">
+        <h3 class="plan-week-title" id="plan-week-${week}">Semana ${week}</h3>
+        ${now ? '<span class="plan-badge">Ahora</span>' : ''}
+        <span class="plan-week-count">${doneCount}/${sessions.length}</span>
+      </div>
       <ol class="plan-sessions">
         ${sessions.map((s) => {
           const done = allDone || Boolean(completed[s.key]);
@@ -213,13 +227,13 @@ function weekCard(plan, week, { completed, next, active, currentWeek, allDone })
           return `
             <li class="plan-session${done ? ' is-done' : ''}${isNext ? ' is-next' : ''}">
               ${done
-                ? '<span class="plan-session-mark" role="img" aria-label="Hecha">✓</span>'
+                ? `<span class="plan-session-mark" role="img" aria-label="Hecha">${icon('check', { size: 18 })}</span>`
                 : `<span class="plan-session-mark" aria-hidden="true">${s.index}</span>`}
               <span class="plan-session-body">
                 <strong>${escapeHtml(focusLabel(s))}</strong>
                 <span class="muted">${s.minutes} min · ${escapeHtml(levelLabel(s.level))}</span>
               </span>
-              ${isNext ? '<span class="plan-session-tag">Siguiente</span>' : ''}
+              ${isNext ? `<span class="plan-session-tag">${icon('play', { size: 14 })}Siguiente</span>` : ''}
             </li>`;
         }).join('')}
       </ol>
@@ -237,49 +251,41 @@ function planView(ctx, { plan, planState, subscription }) {
   const finishedBefore = !active && progress.finished;
 
   return `
-    <button class="link back" data-route="entrenar">← Entrenar</button>
-    <section class="card plan-active plan-premium prem-plan" aria-labelledby="prem-plan-title">
-      <div class="plan-head">
-        <span class="plan-icon prem-icon" aria-hidden="true">👑</span>
-        <div class="plan-head-text">
-          <span class="prem-eyebrow">Premium${subscription?.simulated ? ' · demo' : ''}</span>
-          <h1 id="prem-plan-title">${escapeHtml(plan.name)}</h1>
-        </div>
-      </div>
-      <p class="muted">${escapeHtml(plan.description)}</p>
-      ${active ? `
-        <div class="plan-progress-line">
-          <strong>Semana ${progress.currentWeek} de ${plan.weeks}</strong>
-          <span class="muted">${progress.done}/${progress.total} sesiones</span>
-        </div>
-        ${progressBar(progress.pct, `Tu plan: ${progress.done} de ${progress.total} sesiones`)}` : ''}
-      ${finishedBefore ? '<p class="plan-finished">🎉 ¡Completaste tu plan! Repítelo o edita tus respuestas para crear uno nuevo.</p>' : ''}
+    <section class="card plan-active" aria-labelledby="prem-plan-title">
+      ${planHead({ planId: 'premium', eyebrow: `Premium${subscription?.simulated ? ' · demo' : ''}`, title: escapeHtml(plan.name), id: 'prem-plan-title' })}
+      <p class="muted prem-plan-desc">${escapeHtml(plan.description)}</p>
+      ${active ? planProgressBlock(plan, progress, `Tu plan: ${progress.done} de ${progress.total} sesiones`) : ''}
+      ${finishedBefore ? planDone('¡Completaste tu plan! Repítelo o edita tus respuestas para crear uno nuevo.') : ''}
       ${next ? `
+        ${nextSessionBlock(plan, next, next.equipment ?? plan.equipment)}
         <button class="btn primary big plan-start" data-action="start-session">
-          ${finishedBefore ? '↻ Repetir plan' : '▶ Empezar'} sesión ${sessionNumber(plan, next)}: ${escapeHtml(focusLabel(next))}
-        </button>
-        <p class="hint center">≈ ${next.minutes} min · ${escapeHtml(levelLabel(next.level))} · ${escapeHtml(equipmentText(next.equipment ?? plan.equipment))}</p>`
-        : '<p class="plan-finished">🎉 ¡Has completado tu plan! Edita tus respuestas para crear el siguiente.</p>'}
-      ${other ? `<p class="hint">Ahora tienes «${escapeHtml(other.name)}» en marcha. Al empezar, pasarás a tu plan personalizado.</p>` : ''}
+          ${icon('play', { size: 20 })}<span>${finishedBefore ? 'Repetir plan' : `Empezar sesión ${sessionNumber(plan, next)}`}</span>
+        </button>`
+        : planDone('¡Has completado tu plan! Edita tus respuestas para crear el siguiente.')}
+      ${other ? `<p class="hint prem-other">${icon('info', { size: 16 })}<span>Ahora tienes «${escapeHtml(other.name)}» en marcha. Al empezar, pasarás a tu plan personalizado.</span></p>` : ''}
     </section>
 
     ${plan.notes?.length ? `
       <section class="card prem-notes" aria-labelledby="prem-notes-title">
         <h2 id="prem-notes-title">Adaptado a ti</h2>
         <ul class="prem-notes-list">
-          ${plan.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}
+          ${plan.notes.map((n) => `<li>${icon('check', { size: 18 })}<span>${escapeHtml(n)}</span></li>`).join('')}
         </ul>
       </section>` : ''}
 
-    <div class="prem-weeks">
-      ${weeks.map((w) => weekCard(plan, w, { completed, next, active, currentWeek: progress.currentWeek, allDone: finishedBefore })).join('')}
-    </div>
+    <section class="prem-weeks-section" aria-labelledby="prem-weeks-title">
+      <h2 id="prem-weeks-title">Tus ${plan.weeks} semanas</h2>
+      <div class="prem-weeks">
+        ${weeks.map((w) => weekCard(plan, w, { completed, next, active, currentWeek: progress.currentWeek, allDone: finishedBefore })).join('')}
+      </div>
+    </section>
 
-    <section class="card prem-manage">
-      <p class="prem-manage-status">${escapeHtml(subscriptionText(subscription))}</p>
+    <section class="card prem-manage" aria-labelledby="prem-manage-title">
+      <h2 class="sr-only" id="prem-manage-title">Tu suscripción</h2>
+      <p class="prem-manage-status">${icon('crown', { size: 20 })}<span>${escapeHtml(subscriptionText(subscription))}</span></p>
       <div class="actions wrap">
-        <button class="btn" data-action="edit-answers">✏️ Editar respuestas</button>
-        <button class="btn" data-action="manage">Gestionar suscripción</button>
+        <button class="btn" data-action="edit-answers">${icon('edit', { size: 18 })}Editar respuestas</button>
+        <button class="btn" data-action="manage">${icon('sliders', { size: 18 })}Gestionar suscripción</button>
       </div>
     </section>`;
 }
@@ -323,7 +329,7 @@ export default {
         if (me?.isPremium) {
           stopPolling();
           ctx.backend.clearCheckoutPending?.();
-          toast('¡Ya eres Premium! 👑');
+          toast('¡Ya eres Premium!');
           ctx.rerender();
           return;
         }
@@ -356,7 +362,7 @@ export default {
         confirmThen('Modo demo: se activará Premium 30 días sin cobrar nada.', 'Activar demo', async () => {
           await backend.startCheckout();
           await ctx.refreshMe();
-          toast('Premium de prueba activado 👑 Sin cobros: es la demo.');
+          toast('Premium de prueba activado. Sin cobros: es la demo.');
           ctx.navigate('premium');
         });
         return;
@@ -424,7 +430,7 @@ export default {
         busy = false;
       }
       editing = false;
-      toast(wasEditing ? 'Plan actualizado ✓' : '¡Tu plan está listo! 💪');
+      toast(wasEditing ? 'Plan actualizado' : '¡Tu plan está listo!');
       ctx.navigate('premium');
     },
 

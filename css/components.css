@@ -31,7 +31,7 @@
 .act-linked:hover { border-color: var(--border-strong); }
 
 .act-head { display: flex; align-items: center; gap: 0.75rem; }
-.act-avatar { display: inline-flex; border-radius: 50%; }
+.act-avatar { display: inline-flex; border-radius: 50%; text-decoration: none; }
 .act-who { display: flex; flex-direction: column; min-width: 0; }
 .act-name-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0.1rem 0.35rem; }
 .act-name { color: var(--text); font-weight: 700; text-decoration: none; }
@@ -102,6 +102,7 @@
 
 .court-board {
   position: relative;
+  max-width: calc(100% - 1rem);
   display: grid;
   gap: 0.15rem;
   padding: 0.6rem 0.9rem;
@@ -200,7 +201,7 @@
 
 /* ---------- Seguir ---------- */
 
-.card-follow { min-height: 2.5rem; padding: 0.4rem 1rem; flex-shrink: 0; }
+.card-follow { min-height: 2.75rem; padding: 0.4rem 1rem; flex-shrink: 0; }
 .card-follow[aria-pressed='true'] { color: var(--muted); }
 
 @media (min-width: 720px) {

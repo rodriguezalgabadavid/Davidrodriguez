@@ -132,7 +132,7 @@ function footer(a) {
   return `
     <div class="act-social">
       <button class="act-social-link kudos-who" data-action="show-kudoers" data-id="${id}" data-kudos-who="${id}"${kudos ? '' : ' hidden'}>${kudosWhoLabel(kudos)}</button>
-      <button class="act-social-link act-cm-btn" data-action="open-activity" data-id="${id}" data-focus="comment">
+      <button class="act-social-link act-cm-btn" data-action="open-activity" data-id="${id}" data-focus="comment"${comments ? '' : ' hidden'}>
         <span data-cm-for="${id}" data-cm-label="long"${comments ? '' : ' hidden'}>${commentsLabel(comments)}</span>
       </button>
     </div>
@@ -208,6 +208,8 @@ export function updateCommentCount(activityId, count) {
   for (const el of marked('data-cm-for', activityId)) {
     el.textContent = el.dataset.cmLabel === 'long' ? commentsLabel(n) : String(n);
     el.hidden = n === 0;
+    // Sin comentarios, el enlace del resumen desaparece entero (un botón vacío no tiene nombre accesible).
+    if (el.dataset.cmLabel === 'long') el.closest('.act-cm-btn')?.toggleAttribute('hidden', n === 0);
   }
 }
 

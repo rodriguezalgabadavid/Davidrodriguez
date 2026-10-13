@@ -333,14 +333,14 @@ export default {
         ${streakLine(ctx.cache.before)}
 
         <section class="card post-card">
-          <fieldset class="post-group">
+          <fieldset>
             <legend class="post-legend"><h2 class="post-h">¿Qué has hecho?</h2></legend>
             <div class="segmented post-types">${typeOptions(type)}</div>
           </fieldset>
         </section>
 
-        <section class="card post-card post-match" data-only="partido" ${type === 'partido' ? '' : 'hidden'}>
-          <fieldset class="post-group post-results" id="post-results">
+        <section class="card post-card" data-only="partido" ${type === 'partido' ? '' : 'hidden'}>
+          <fieldset id="post-results">
             <legend class="post-legend">
               <h2 class="post-h">¿Cómo ha ido?</h2>
               <span class="post-locked-note">${icon('lock', { size: 16 })}Según el marcador</span>

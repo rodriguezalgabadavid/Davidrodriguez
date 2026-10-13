@@ -121,7 +121,7 @@ function achievementsHtml(list) {
 
 function challengeRow(c, i) {
   return `
-    <li class="cel-row cel-challenge cel-pop${c.completedNow ? ' cel-done' : ''}" style="--i:${i}">
+    <li class="cel-row cel-pop${c.completedNow ? ' cel-done' : ''}" style="--i:${i}">
       <span class="cel-row-icon" aria-hidden="true">${escapeHtml(c.icon)}</span>
       <span class="cel-row-body">
         <span class="cel-row-title">
@@ -148,7 +148,7 @@ function streakRow(streak, delta, index) {
   else if (delta) text = 'Una actividad por semana y la racha sigue creciendo.';
   else text = 'Esta semana ya cuenta para tu racha.';
   return `
-    <li class="cel-row cel-streak${delta ? ' cel-pop' : ''}" style="--i:${index}">
+    <li class="cel-row${delta ? ' cel-pop' : ''}" style="--i:${index}">
       <span class="cel-row-icon cel-flame">${icon('flame', { size: 24 })}</span>
       <span class="cel-row-body">
         <span class="cel-row-title">
@@ -189,13 +189,16 @@ function celebrationHtml(ctx, { activity, before, after }) {
     ${confetti()}
     <div class="cel-box" role="dialog" aria-modal="true" aria-labelledby="cel-title" aria-describedby="cel-sub">
       <header class="cel-head">
-        <svg class="cel-court" viewBox="0 0 200 100" aria-hidden="true" focusable="false">
-          <rect x="6" y="6" width="188" height="88" rx="2"/>
-          <path d="M37 6v88M163 6v88M37 50h126"/>
-          <path class="cel-court-net" d="M100 2v96"/>
-        </svg>
-        <div class="cel-head-inner">
+        <div class="cel-stage">
+          <svg class="cel-court" viewBox="0 0 200 100" aria-hidden="true" focusable="false">
+            <rect x="6" y="6" width="188" height="88" rx="2"/>
+            <path d="M37 6v88M163 6v88M37 50h126"/>
+            <path class="cel-court-net" d="M100 2v96"/>
+          </svg>
+          <span class="cel-ball" aria-hidden="true"></span>
           ${art}
+        </div>
+        <div class="cel-head-inner">
           <p class="cel-kicker">${icon('check', { size: 16 })}Publicado en tu muro</p>
           <h2 id="cel-title" class="cel-title">${escapeHtml(head.title)}</h2>
           <p id="cel-sub" class="cel-sub">${escapeHtml(sub)}</p>

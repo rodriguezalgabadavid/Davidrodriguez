@@ -1,5 +1,6 @@
 import { CATEGORIES, EXERCISES, LEVELS } from '../data.js';
 import { PREMIUM_QUESTIONS } from '../plans.js';
+import { icon } from '../icons.js';
 import { emptyState, escapeHtml } from '../ui.js';
 
 // Biblioteca de ejercicios: búsqueda + categorías + tarjetas desplegables.
@@ -29,19 +30,23 @@ function exerciseCard(ex) {
   const c = CATEGORIES[ex.category] ?? { label: ex.category, color: 'currentColor' };
   const pills = [
     ex.sides ? '<span class="pill">Ambos lados</span>' : '',
-    ...ex.equipment.map((e) => `<span class="pill">${escapeHtml(EQUIPMENT_LABELS[e] ?? e)}</span>`),
-    `<span class="pill">${escapeHtml(LEVELS[ex.level]?.label ?? '')}</span>`,
+    ...(ex.equipment.length
+      ? ex.equipment.map((e) => `<span class="pill">${escapeHtml(EQUIPMENT_LABELS[e] ?? e)}</span>`)
+      : ['<span class="pill">Sin material</span>']),
   ].join('');
   return `
     <details class="exercise lib-exercise">
       <summary>
         <span class="dot" style="--tag:${escapeHtml(c.color)}" aria-hidden="true"></span>
-        <span class="exercise-name">${escapeHtml(ex.name)}</span>
+        <span class="lib-ex-text">
+          <span class="exercise-name">${escapeHtml(ex.name)}</span>
+          <span class="lib-ex-meta">${escapeHtml(c.label)} · ${escapeHtml(LEVELS[ex.level]?.label ?? '')}</span>
+        </span>
+        <span class="lib-ex-chevron" aria-hidden="true">${icon('chevron', { size: 20 })}</span>
       </summary>
       <div class="exercise-body">
-        <span class="tag" style="--tag:${escapeHtml(c.color)}">${escapeHtml(c.label)}</span>
         <p>${escapeHtml(ex.description)}</p>
-        <p class="why"><strong>En pista:</strong> ${escapeHtml(ex.padel)}</p>
+        <p class="why lib-why">${icon('ball', { size: 18 })}<span><strong>En pista:</strong> ${escapeHtml(ex.padel)}</span></p>
         <div class="pills">${pills}</div>
       </div>
     </details>`;
@@ -53,7 +58,7 @@ function countText(n) {
 
 function resultsHtml(list) {
   if (!list.length) {
-    return emptyState({ icon: '🔍', title: 'Sin resultados', text: 'Prueba con otra palabra o elige otra categoría.' });
+    return emptyState({ icon: icon('search', { size: 30 }), title: 'Sin resultados', text: 'Prueba con otra palabra o elige otra categoría.' });
   }
   return list.map(exerciseCard).join('');
 }
@@ -82,22 +87,21 @@ export default {
     const chip = (key, label) => `
       <button class="chip${category === key ? ' on' : ''}" data-action="category" data-value="${escapeHtml(key)}" aria-pressed="${category === key}">${escapeHtml(label)}</button>`;
     return `
-      <button class="link back" data-route="entrenar">← Entrenar</button>
-      <header class="lib-head">
-        <h1>Biblioteca de ejercicios</h1>
-        <p class="muted">Cada ejercicio, explicado y con su para qué en pista.</p>
-      </header>
-      <section class="card lib-filters">
-        <label class="lib-search-label" for="lib-query">Buscar ejercicio</label>
-        <input class="search lib-search" id="lib-query" type="search" inputmode="search" autocomplete="off"
-          maxlength="${MAX_QUERY}" placeholder="Hombro, salto, rotación…" value="${escapeHtml(query)}" data-input="search" />
+      <p class="muted lib-intro">Cada ejercicio, explicado y con su para qué en pista.</p>
+      <div class="lib-filters">
+        <label class="sr-only" for="lib-query">Buscar ejercicio</label>
+        <div class="lib-search-wrap">
+          <span class="lib-search-icon" aria-hidden="true">${icon('search', { size: 20 })}</span>
+          <input class="input search lib-search" id="lib-query" type="search" inputmode="search" autocomplete="off"
+            maxlength="${MAX_QUERY}" placeholder="Hombro, salto, rotación…" value="${escapeHtml(query)}" data-input="search" />
+        </div>
         <div class="chips scroll lib-chips" role="group" aria-label="Categorías">
           ${chip('all', 'Todos')}
           ${Object.entries(CATEGORIES).map(([key, c]) => chip(key, c.label)).join('')}
         </div>
-      </section>
-      <p class="lib-count" id="lib-count" role="status" aria-live="polite">${countText(list.length)}</p>
-      <section class="library lib-results" id="lib-results">
+      </div>
+      <p class="label lib-count" id="lib-count" role="status" aria-live="polite">${countText(list.length)}</p>
+      <section class="library lib-results" id="lib-results" aria-label="Ejercicios">
         ${resultsHtml(list)}
       </section>`;
   },

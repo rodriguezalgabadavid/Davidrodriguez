@@ -1,11 +1,13 @@
 import { POSITIONS } from '../activities.js';
 import { completedChallenges } from '../challenges.js';
-import { activityCard, globalActions } from '../components.js';
+import { activityCard, demoTag, globalActions } from '../components.js';
 import { LEVELS } from '../data.js';
+import { icon } from '../icons.js';
 import { achievements, matchStats, weekSummary, weeklyStreak } from '../stats.js';
 import { avatar, emptyState, escapeHtml, formatHours, premiumBadge, sheet } from '../ui.js';
 
-// Perfil (mío o de otro jugador): cabecera social, rachas y balance, logros y su actividad.
+// Perfil (mío o de otro jugador) al estilo del perfil de atleta de Strava: cabecera con avatar grande,
+// contadores, la semana y las estadísticas, la tira de logros, compañeros y su actividad.
 
 const PAGE = 20;
 const STATS_LIMIT = 500; // actividades de otro jugador que se usan para sus estadísticas
@@ -14,54 +16,85 @@ const GOAL_MAX = 7;
 const plural = (n, one, many) => (n === 1 ? one : many);
 const attr = (v) => escapeHtml(v ?? '');
 
-const demoTag = (p) => (p?.demo ? '<span class="prof-demo" title="Jugador de ejemplo del modo demo">ejemplo</span>' : '');
-
-const backLink = '<button class="link prof-back" data-action="back">← Volver</button>';
-
 // ---------- Cabecera ----------
 
 function metaLine(p) {
-  return [p.club, LEVELS[p.level]?.label, POSITIONS[p.position]].filter(Boolean).map(escapeHtml).join(' · ');
+  const level = LEVELS[p.level]?.label;
+  const parts = [level ? `Nivel ${level.toLowerCase()}` : '', POSITIONS[p.position] ?? ''].filter(Boolean);
+  return `
+    ${p.club ? `<p class="prof-meta prof-club">${icon('pin', { size: 16 })}<span>${escapeHtml(p.club)}</span></p>` : ''}
+    ${parts.length ? `<p class="prof-meta">${parts.map((t) => `<span class="prof-meta-item">${escapeHtml(t)}</span>`).join('')}</p>` : ''}`;
 }
 
 function followButton(p) {
   const on = Boolean(p.followedByMe);
   return `
-    <button class="btn prof-follow${on ? '' : ' primary'}" data-action="${on ? 'unfollow' : 'follow'}"
+    <button class="btn big prof-follow${on ? '' : ' primary'}" data-action="${on ? 'unfollow' : 'follow'}"
       data-user-id="${attr(p.id)}" data-name="${attr(p.name)}" aria-pressed="${on ? 'true' : 'false'}">${on ? 'Siguiendo' : 'Seguir'}</button>`;
 }
 
 function header(p, { isMe, activityCount }) {
   const id = attr(p.id);
-  const meta = metaLine(p);
   const followers = Number(p.followersCount) || 0;
   const following = Number(p.followingCount) || 0;
+  const acts = Number.parseInt(activityCount, 10) || 0;
   return `
     <header class="card prof-head">
       <div class="prof-top">
-        ${avatar(p, 'lg')}
+        <span class="prof-avatar">${avatar(p, 'lg')}</span>
         <div class="prof-id">
-          <h1 class="prof-name"><span>${escapeHtml(p.name)}</span>${premiumBadge(p)}${demoTag(p)}</h1>
-          ${meta ? `<p class="prof-meta">${meta}</p>` : ''}
+          <h2 class="prof-name"><span class="prof-name-text">${escapeHtml(p.name)}</span>${premiumBadge(p)}${demoTag(p)}</h2>
+          ${metaLine(p)}
         </div>
       </div>
       ${p.bio ? `<p class="prof-bio">${escapeHtml(p.bio)}</p>` : ''}
       <div class="prof-counts">
-        <div class="prof-count"><strong>${escapeHtml(activityCount)}</strong><span>actividades</span></div>
-        <button class="prof-count" data-action="show-people" data-kind="followers" data-owner="${id}">
-          <strong data-prof-followers="${id}">${followers}</strong><span>${plural(followers, 'seguidor', 'seguidores')}</span>
-        </button>
         <button class="prof-count" data-action="show-people" data-kind="following" data-owner="${id}">
-          <strong>${following}</strong><span>siguiendo</span>
+          <strong class="prof-count-num">${following}</strong><span class="prof-count-label">Siguiendo</span>
         </button>
+        <button class="prof-count" data-action="show-people" data-kind="followers" data-owner="${id}">
+          <strong class="prof-count-num" data-prof-followers="${id}">${followers}</strong><span class="prof-count-label">${plural(followers, 'Seguidor', 'Seguidores')}</span>
+        </button>
+        <div class="prof-count">
+          <strong class="prof-count-num">${escapeHtml(activityCount)}</strong><span class="prof-count-label">${plural(acts, 'Actividad', 'Actividades')}</span>
+        </div>
       </div>
-      <div class="prof-actions">
-        ${isMe ? '<button class="btn" data-route="ajustes">Editar perfil</button>' : followButton(p)}
-      </div>
+      ${isMe ? `<button class="btn big prof-edit" data-route="ajustes">${icon('edit', { size: 20 })}<span>Editar perfil</span></button>` : followButton(p)}
     </header>`;
 }
 
-// ---------- Destacados ----------
+// ---------- Esta semana (solo en mi perfil) ----------
+
+function delta(diff, format = String) {
+  if (!diff) return '<dd class="prof-delta">Igual</dd>';
+  return diff > 0
+    ? `<dd class="prof-delta up">+${escapeHtml(format(diff))}</dd>`
+    : `<dd class="prof-delta down">−${escapeHtml(format(-diff))}</dd>`;
+}
+
+function weekCard(activities, ctx) {
+  const { current: cur, previous: prev } = weekSummary(activities, ctx.now);
+  const goal = Math.min(GOAL_MAX, Math.max(1, Math.round(Number(ctx.settings?.weeklyGoal) || 3)));
+  const pct = Math.min(100, Math.round((cur.count / goal) * 100));
+  const reached = cur.count >= goal;
+  return `
+    <section class="card prof-card" aria-labelledby="prof-week-title">
+      <div class="prof-card-head">
+        <h2 id="prof-week-title">Esta semana</h2>
+        <span class="prof-goal${reached ? ' done' : ''}">${reached ? icon('check', { size: 18 }) : ''}<span><strong>${cur.count}</strong> de ${goal} de tu objetivo</span></span>
+      </div>
+      <div class="progress prof-goal-bar${reached ? ' done' : ''}" role="progressbar" aria-label="Objetivo semanal"
+        aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${Math.min(cur.count, goal)}"><div style="width:${pct}%"></div></div>
+      <dl class="stats-row prof-week-stats">
+        <div><dt class="stat-label">Actividades</dt><dd class="stat-value">${cur.count}</dd>${delta(cur.count - prev.count)}</div>
+        <div><dt class="stat-label">Tiempo</dt><dd class="stat-value">${escapeHtml(formatHours(cur.minutes))}</dd>${delta(cur.minutes - prev.minutes, formatHours)}</div>
+        <div><dt class="stat-label">Partidos G–P</dt><dd class="stat-value">${cur.wins}–${cur.losses}</dd></div>
+      </dl>
+      <p class="prof-note">Diferencia con la semana pasada</p>
+    </section>`;
+}
+
+// ---------- Estadísticas ----------
 
 function monthMinutes(activities, now) {
   const from = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -75,92 +108,76 @@ function monthMinutes(activities, now) {
   return Math.round(seconds / 60);
 }
 
-function highlights(activities, stats, ctx, isMe) {
+function statsCard(activities, stats, ctx, isMe) {
   const streak = weeklyStreak(activities, ctx.now);
   const atRisk = isMe && streak.weeks > 0 && !streak.activeThisWeek;
+  const rate = stats.winRate == null
+    ? '<span aria-hidden="true">—</span><span class="sr-only">Sin resultados</span>'
+    : `${stats.winRate}<small>%</small>`;
   return `
-    <div class="prof-highlights">
-      <div class="card prof-stat">
-        <span class="prof-stat-big">🔥 ${streak.weeks}</span>
-        <span class="prof-stat-label">${plural(streak.weeks, 'semana', 'semanas')} de racha</span>
-        ${atRisk ? '<span class="prof-stat-sub prof-risk">¡Juega esta semana!</span>' : ''}
-      </div>
-      <div class="card prof-stat">
-        <span class="prof-stat-big">${stats.won}–${stats.lost}</span>
-        <span class="prof-stat-label">Partidos G–P</span>
-        <span class="prof-stat-sub">${stats.winRate == null ? 'Sin resultados' : `${stats.winRate} % victorias`}</span>
-      </div>
-      <div class="card prof-stat">
-        <span class="prof-stat-big">${escapeHtml(formatHours(monthMinutes(activities, ctx.now)))}</span>
-        <span class="prof-stat-label">Este mes</span>
-      </div>
-    </div>`;
+    <section class="card prof-card" aria-labelledby="prof-stats-title">
+      <h2 id="prof-stats-title">Estadísticas</h2>
+      <dl class="stats-row prof-stats">
+        <div>
+          <dt class="stat-label">Racha</dt>
+          <dd class="stat-value prof-streak"><span class="prof-flame${streak.weeks ? ' on' : ''}" aria-hidden="true">${icon('flame', { size: 16 })}</span>${streak.weeks}<small aria-hidden="true">sem.</small><span class="sr-only"> ${plural(streak.weeks, 'semana', 'semanas')}</span></dd>
+        </div>
+        <div><dt class="stat-label">Partidos G–P</dt><dd class="stat-value">${stats.won}–${stats.lost}</dd></div>
+        <div><dt class="stat-label">Victorias</dt><dd class="stat-value">${rate}</dd></div>
+        <div><dt class="stat-label">Horas este mes</dt><dd class="stat-value">${escapeHtml(formatHours(monthMinutes(activities, ctx.now)))}</dd></div>
+      </dl>
+      ${atRisk ? `<p class="prof-risk">${icon('flame', { size: 18 })}<span>¡Juega esta semana para no perder tu racha!</span></p>` : ''}
+    </section>`;
 }
 
 // ---------- Logros ----------
 
+function medal(b) {
+  return `
+    <li class="prof-medal${b.unlocked ? ' on' : ''}" title="${attr(b.description)}">
+      <span class="prof-medal-disc" aria-hidden="true">
+        <span class="prof-medal-art">${escapeHtml(b.icon)}</span>
+        ${b.unlocked ? '' : `<span class="prof-medal-lock">${icon('lock', { size: 12 })}</span>`}
+      </span>
+      <span class="prof-medal-label">${b.unlocked ? '' : '<span class="sr-only">Pendiente: </span>'}${escapeHtml(b.label)}</span>
+    </li>`;
+}
+
 function badgeStrip(list, isMe) {
   const unlocked = list.filter((b) => b.unlocked);
-  const items = unlocked.length
-    ? `<ul class="prof-badges">${unlocked.map((b) => `
-        <li class="prof-badge" title="${attr(b.description)}">
-          <span class="prof-badge-icon" aria-hidden="true">${escapeHtml(b.icon)}</span>
-          <span class="prof-badge-label">${escapeHtml(b.label)}</span>
-        </li>`).join('')}</ul>`
-    : `<p class="muted">${isMe ? 'Aún no tienes logros: publica tu primer partido para estrenarte.' : 'Aún no tiene logros.'}</p>`;
+  const sorted = [...unlocked, ...list.filter((b) => !b.unlocked)];
+  const empty = isMe ? 'Aún no tienes logros: publica tu primer partido para estrenarte.' : 'Aún no tiene logros.';
   return `
-    <section class="card prof-logros${isMe ? ' prof-tap' : ''}" aria-labelledby="prof-logros-title" ${isMe ? 'data-route="retos"' : ''}>
-      <div class="row-between">
-        <h2 id="prof-logros-title">Logros <span class="muted">${unlocked.length}/${list.length}</span></h2>
-        ${isMe ? '<button class="link" data-route="retos">Ver todos</button>' : ''}
+    <section class="card prof-card${isMe ? ' prof-tap' : ''}" aria-labelledby="prof-logros-title" ${isMe ? 'data-route="retos"' : ''}>
+      <div class="prof-card-head">
+        <h2 id="prof-logros-title">Logros <span class="prof-head-count">${unlocked.length}/${list.length}</span></h2>
+        ${isMe ? `<button class="link prof-see-all" data-route="retos">Ver todos${icon('chevron', { size: 18 })}</button>` : ''}
       </div>
-      ${items}
+      ${unlocked.length ? '' : `<p class="prof-note">${empty}</p>`}
+      <ul class="prof-medals" tabindex="0" aria-labelledby="prof-logros-title">${sorted.map(medal).join('')}</ul>
     </section>`;
 }
 
-// ---------- Solo en mi perfil ----------
-
-function delta(diff, format = String) {
-  if (!diff) return '<span class="prof-delta">=</span>';
-  return diff > 0
-    ? `<span class="prof-delta up">+${escapeHtml(format(diff))}</span>`
-    : `<span class="prof-delta down">−${escapeHtml(format(-diff))}</span>`;
-}
-
-function weekCard(activities, ctx) {
-  const { current: cur, previous: prev } = weekSummary(activities, ctx.now);
-  const goal = Math.min(GOAL_MAX, Math.max(1, Math.round(Number(ctx.settings?.weeklyGoal) || 3)));
-  const pct = Math.min(100, Math.round((cur.count / goal) * 100));
-  return `
-    <section class="card prof-week" aria-labelledby="prof-week-title">
-      <div class="row-between">
-        <h2 id="prof-week-title">Tu semana</h2>
-        <span class="muted">${cur.count}/${goal} de tu objetivo</span>
-      </div>
-      <div class="prof-progress" role="progressbar" aria-label="Objetivo semanal" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${Math.min(cur.count, goal)}">
-        <span style="width:${pct}%"></span>
-      </div>
-      <dl class="prof-week-grid">
-        <div><dt>Actividades</dt><dd>${cur.count} ${delta(cur.count - prev.count)}</dd></div>
-        <div><dt>Tiempo</dt><dd>${escapeHtml(formatHours(cur.minutes))} ${delta(cur.minutes - prev.minutes, formatHours)}</dd></div>
-        <div><dt>Partidos G–P</dt><dd>${cur.wins}–${cur.losses}</dd></div>
-      </dl>
-      <p class="prof-week-note muted">Comparado con la semana pasada</p>
-    </section>`;
-}
+// ---------- Mejores compañeros (solo en mi perfil) ----------
 
 function partnersCard(stats) {
   const top = stats.partners.slice(0, 3);
   if (!top.length) return '';
   return `
-    <section class="card prof-partners" aria-labelledby="prof-partners-title">
+    <section class="card prof-card" aria-labelledby="prof-partners-title">
       <h2 id="prof-partners-title">Mejores compañeros</h2>
-      <ol class="prof-partner-list">
+      <ol class="prof-rows">
         ${top.map((p) => `
-          <li class="prof-partner">
-            <span class="prof-partner-name">${escapeHtml(p.name)}</span>
-            <span class="muted">${p.played} ${plural(p.played, 'partido', 'partidos')}</span>
-            <span class="prof-partner-rec">${p.won}–${p.lost}</span>
+          <li class="prof-row">
+            <span class="prof-row-avatar" aria-hidden="true">${avatar({ id: p.name, name: p.name })}</span>
+            <span class="prof-row-text">
+              <strong class="prof-row-name" title="${attr(p.name)}">${escapeHtml(p.name)}</strong>
+              <span class="prof-row-sub">${p.played} ${plural(p.played, 'partido juntos', 'partidos juntos')}</span>
+            </span>
+            <span class="prof-row-end">
+              <strong class="prof-rec">${p.won}–${p.lost}</strong>
+              <span class="prof-row-sub">G–P</span>
+            </span>
           </li>`).join('')}
       </ol>
     </section>`;
@@ -175,14 +192,15 @@ function moreButton(ownerId, list) {
 
 function activitySection(list, ctx, { isMe, profile }) {
   if (!list.length) {
-    return isMe
+    const state = isMe
       ? emptyState({
-        icon: '🎾',
+        icon: icon('ball', { size: 30 }),
         title: 'Aún no has publicado nada',
         text: 'Tu primer partido o entreno aparecerá aquí.',
-        action: '<button class="btn primary" data-route="publicar">Publicar actividad</button>',
+        action: `<button class="btn primary" data-route="publicar">${icon('plus', { size: 20 })}<span>Publicar actividad</span></button>`,
       })
-      : emptyState({ icon: '🎾', title: 'Todavía no ha publicado nada', text: `Cuando ${profile.name} publique, lo verás aquí.` });
+      : emptyState({ icon: icon('ball', { size: 30 }), title: 'Todavía no ha publicado nada', text: `Cuando ${profile.name} publique, lo verás aquí.` });
+    return `<div class="card prof-empty">${state}</div>`;
   }
   return `
     <section class="prof-activity" aria-labelledby="prof-act-title">
@@ -196,10 +214,13 @@ function activitySection(list, ctx, { isMe, profile }) {
 
 function personRow(p, meId) {
   const isMe = Boolean(meId) && p.id === meId;
+  const name = isMe ? 'Tú' : p.name;
   return `
     <li>
       <button class="prof-person" data-route="perfil" ${isMe ? '' : `data-param-id="${attr(p.id)}"`}>
-        ${avatar(p, 'sm')}<span class="prof-person-name">${isMe ? 'Tú' : escapeHtml(p.name)}</span>${premiumBadge(p)}${demoTag(p)}
+        <span class="prof-row-avatar" aria-hidden="true">${avatar(p)}</span>
+        <span class="prof-person-name" title="${attr(name)}">${escapeHtml(name)}</span>${premiumBadge(p)}${demoTag(p)}
+        <span class="prof-person-go" aria-hidden="true">${icon('chevron', { size: 18 })}</span>
       </button>
     </li>`;
 }
@@ -210,7 +231,7 @@ function bumpFollowers(userId, diff) {
     const n = Math.max(0, (Number(el.textContent) || 0) + diff);
     el.textContent = String(n);
     const label = el.nextElementSibling;
-    if (label) label.textContent = plural(n, 'seguidor', 'seguidores');
+    if (label) label.textContent = plural(n, 'Seguidor', 'Seguidores');
   }
 }
 
@@ -237,13 +258,14 @@ export default {
     if (!profile) {
       return `
         <section class="prof-view">
-          ${backLink}
-          ${emptyState({
-            icon: '🤷',
-            title: 'No encontramos a este jugador',
-            text: 'Puede que el enlace ya no sea válido.',
-            action: '<button class="btn primary" data-route="buscar">Buscar jugadores</button>',
-          })}
+          <div class="card prof-empty">
+            ${emptyState({
+              icon: icon('user', { size: 30 }),
+              title: 'No encontramos a este jugador',
+              text: 'Puede que el enlace ya no sea válido.',
+              action: `<button class="btn primary" data-route="buscar">${icon('search', { size: 20 })}<span>Buscar jugadores</span></button>`,
+            })}
+          </div>
         </section>`;
     }
 
@@ -256,11 +278,10 @@ export default {
 
     return `
       <section class="prof-view">
-        ${isMe ? '' : backLink}
         ${header(profile, { isMe, activityCount })}
-        ${highlights(all, stats, ctx, isMe)}
-        ${badgeStrip(badges, isMe)}
         ${isMe ? weekCard(all, ctx) : ''}
+        ${statsCard(all, stats, ctx, isMe)}
+        ${badgeStrip(badges, isMe)}
         ${isMe ? partnersCard(stats) : ''}
         ${activitySection(list, ctx, { isMe, profile })}
       </section>`;
@@ -310,7 +331,7 @@ export default {
           <h2>${followers ? 'Seguidores' : 'Siguiendo'} <span class="muted">${people.length}</span></h2>
           ${people.length
             ? `<ul class="prof-people">${people.map((p) => personRow(p, ctx.me?.id)).join('')}</ul>`
-            : `<p class="muted">${empty}</p>${mine && !followers ? '<button class="btn primary" data-route="buscar">Buscar jugadores</button>' : ''}`}
+            : `<p class="muted">${empty}</p>${mine && !followers ? `<button class="btn primary big" data-route="buscar">${icon('search', { size: 20 })}<span>Buscar jugadores</span></button>` : ''}`}
         </div>`);
     },
 
