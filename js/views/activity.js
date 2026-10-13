@@ -1,7 +1,9 @@
 import { KUDOS_EVENT, activityCard, demoTag, globalActions, updateCommentCount } from '../components.js';
+import { icon } from '../icons.js';
 import { askConfirm, avatar, emptyState, escapeHtml, formatWhen, premiumBadge, timeAgo, toast } from '../ui.js';
 
-// Detalle de una actividad: tarjeta completa, quién ha dado "¡Vamos!", comentarios y caja para comentar.
+// Detalle de una actividad: tarjeta completa, quién ha dado "¡Vamos!", comentarios y caja para comentar
+// (fija encima de la barra inferior, como en Strava). Volver está en la barra superior.
 
 const MAX_COMMENT = 500;
 
@@ -19,17 +21,23 @@ const profileLink = (id) => `href="#perfil" data-route="perfil" data-param-id="$
 
 function kudoersRow(activityId, isMine, kudoers, meId) {
   if (!kudoers.length) {
-    return `<p class="act-kudoers-empty muted">${isMine
-      ? 'Aún nadie te ha dado ¡Vamos! en esta actividad.'
-      : 'Sé el primero en darle ¡Vamos! 🙌'}</p>`;
+    return `
+      <p class="act-kudoers-empty">
+        <span class="act-kudoers-icon" aria-hidden="true">${icon('racket', { size: 20 })}</span>
+        <span>${isMine ? 'Aún nadie te ha dado ¡Vamos! en esta actividad.' : 'Sé el primero en darle ¡Vamos!'}</span>
+      </p>`;
   }
   const names = kudoers.slice(0, 2).map((p) => (p.id === meId ? 'Tú' : p.name));
   const rest = kudoers.length - names.length;
   const who = rest > 0 ? `${names.join(', ')} y ${rest} más` : names.join(' y ');
   return `
     <button class="act-kudoers-btn" data-action="show-kudoers" data-id="${escapeHtml(activityId)}">
-      <span class="act-stack" aria-hidden="true">${kudoers.slice(0, 5).map((p) => avatar(p, 'sm')).join('')}</span>
-      <span class="act-kudoers-text"><strong>🙌 ${kudoers.length} ¡Vamos!</strong> · ${escapeHtml(who)}</span>
+      <span class="act-stack" aria-hidden="true">${kudoers.slice(0, 4).map((p) => avatar(p, 'sm')).join('')}</span>
+      <span class="act-kudoers-text">
+        <strong>${kudoers.length} ¡Vamos!</strong>
+        <span class="act-kudoers-who">${escapeHtml(who)}</span>
+      </span>
+      <span class="act-kudoers-chevron" aria-hidden="true">${icon('chevron', { size: 20 })}</span>
     </button>`;
 }
 
@@ -38,15 +46,15 @@ function commentItem(c, now, canDelete = c.isMine) {
   const author = c.author ?? { id: '', name: 'Jugador' };
   return `
     <li class="cm-item" data-comment-id="${escapeHtml(c.id)}">
-      <a class="cm-avatar" ${profileLink(author.id)} tabindex="-1" aria-hidden="true">${avatar(author, 'sm')}</a>
+      <a class="cm-avatar" ${profileLink(author.id)} tabindex="-1" aria-hidden="true">${avatar(author)}</a>
       <div class="cm-body">
-        <div class="cm-head">
+        <p class="cm-head">
           <a class="cm-name" ${profileLink(author.id)}>${escapeHtml(author.name)}</a>${premiumBadge(author)}${demoTag(author)}
           <time class="cm-time" datetime="${escapeHtml(c.createdAt)}" title="${escapeHtml(formatWhen(c.createdAt, now))}">${escapeHtml(timeAgo(c.createdAt, now))}</time>
-          ${canDelete ? `<button class="cm-delete" data-action="delete-comment" data-comment-id="${escapeHtml(c.id)}" aria-label="Borrar comentario">✕</button>` : ''}
-        </div>
+        </p>
         <p class="cm-text">${escapeHtml(c.text)}</p>
       </div>
+      ${canDelete ? `<button class="icon-plain cm-delete" data-action="delete-comment" data-comment-id="${escapeHtml(c.id)}" aria-label="Borrar comentario" title="Borrar comentario">${icon('trash', { size: 18 })}</button>` : ''}
     </li>`;
 }
 
@@ -62,7 +70,7 @@ function notFound() {
   return `
     <section class="act-view">
       ${emptyState({
-        icon: '🔍',
+        icon: icon('search', { size: 30 }),
         title: 'Esta actividad ya no existe',
         text: 'Puede que su autor la haya borrado.',
         action: '<button class="btn primary" data-route="inicio">Volver al inicio</button>',
@@ -97,26 +105,29 @@ export default {
 
     return `
       <section class="act-view" data-activity="${escapeHtml(id)}" data-mine="${activity.isMine ? '1' : ''}">
-        <div class="act-topbar">
-          <button class="link act-back" data-action="back">← Volver</button>
-          ${activity.isMine ? '<button class="act-delete" data-action="delete-activity">🗑️ Borrar</button>' : ''}
-        </div>
-
         ${activityCard(activity, ctx, { link: false })}
 
-        <div class="act-kudoers" id="act-kudoers">${kudoersRow(id, activity.isMine, kudoers, ctx.me?.id)}</div>
+        <div class="card act-kudoers" id="act-kudoers">${kudoersRow(id, activity.isMine, kudoers, ctx.me?.id)}</div>
 
         <section class="card cm-section" aria-labelledby="cm-title">
           <h2 id="cm-title" class="cm-title">Comentarios <span class="cm-count" data-cm-for="${escapeHtml(id)}"${n ? '' : ' hidden'}>${n}</span></h2>
           <ol class="cm-list" id="cm-list">${comments.map((c) => commentItem(c, ctx.now, c.isMine || activity.isMine)).join('')}</ol>
-          <p class="cm-empty muted"${n ? ' hidden' : ''}>Aún no hay comentarios. ¡Anímale con el primero!</p>
+          <p class="cm-empty"${n ? ' hidden' : ''}>
+            <span class="cm-empty-icon" aria-hidden="true">${icon('comment', { size: 20 })}</span>
+            <span>Aún no hay comentarios. ¡Anímale con el primero!</span>
+          </p>
         </section>
 
+        ${activity.isMine ? `<button class="act-delete" data-action="delete-activity">${icon('trash', { size: 18 })}<span>Borrar actividad</span></button>` : ''}
+
         <form class="cm-form" data-submit="comment" autocomplete="off">
-          ${avatar(ctx.me, 'sm')}
-          <input class="input cm-input" name="text" type="text" maxlength="${MAX_COMMENT}" value="${escapeHtml(draft)}"
-            placeholder="Escribe un comentario…" aria-label="Escribe un comentario" enterkeyhint="send" data-input="draft" />
-          <button class="btn primary cm-send" type="submit">Enviar</button>
+          <div class="cm-form-inner">
+            ${avatar(ctx.me, 'sm')}
+            <label class="sr-only" for="cm-input">Escribe un comentario</label>
+            <input class="input cm-input" id="cm-input" name="text" type="text" maxlength="${MAX_COMMENT}" value="${escapeHtml(draft)}"
+              placeholder="Añade un comentario…" enterkeyhint="send" data-input="draft" />
+            <button class="btn primary cm-send" type="submit">${icon('play', { size: 16, className: 'cm-send-icon' })}<span>Enviar</span></button>
+          </div>
         </form>
       </section>`;
   },

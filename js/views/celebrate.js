@@ -1,5 +1,6 @@
 import { activityTitle, formatScore } from '../activities.js';
 import { challengeProgress, completedChallenges, currentChallenges } from '../challenges.js';
+import { icon } from '../icons.js';
 import { achievements, newlyUnlocked, weeklyStreak } from '../stats.js';
 import { escapeHtml, formatDuration } from '../ui.js';
 
@@ -38,17 +39,18 @@ export async function snapshot(ctx) {
 }
 
 const numFmt = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 });
-const CONFETTI_COLORS = ['--accent', '--primary', '--t-partido', '--t-clase', '--win', '--loss'];
+// Confeti con los colores de la marca: amarillo bola, azul de pista y blanco de las líneas.
+const CONFETTI_COLORS = ['--accent', '--primary', '--court-line', '--accent', '--court', '--court-line'];
 const FOCUSABLE = 'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])';
 
 function headline(activity) {
   if (activity?.type === 'partido') {
-    if (activity.won === true) return { icon: '🏆', title: '¡Victoria publicada!', text: '' };
-    if (activity.won === false) return { icon: '💪', title: '¡Partido publicado!', text: 'Hoy no salió, pero ya suma. ¡A por la revancha!' };
-    return { icon: '🎾', title: '¡Partido publicado!', text: '' };
+    if (activity.won === true) return { icon: 'trophy', title: '¡Victoria publicada!', text: '' };
+    if (activity.won === false) return { icon: 'ball', title: '¡Partido publicado!', text: 'Hoy no salió, pero ya suma. ¡A por la revancha!' };
+    return { icon: 'ball', title: '¡Partido publicado!', text: '' };
   }
-  if (activity?.type === 'clase') return { icon: '🎯', title: '¡Clase completada!', text: '' };
-  return { icon: '⚡', title: '¡Entreno completado!', text: '' };
+  if (activity?.type === 'clase') return { icon: 'target', title: '¡Clase completada!', text: '' };
+  return { icon: 'bolt', title: '¡Entreno completado!', text: '' };
 }
 
 function subtitle(activity) {
@@ -89,7 +91,7 @@ export function diffSnapshots(before, after) {
 }
 
 function confetti() {
-  const pieces = Array.from({ length: 28 }, (_, i) => {
+  const pieces = Array.from({ length: 30 }, (_, i) => {
     const x = (i * 37 + 11) % 100;
     const delay = ((i * 7) % 10) / 10;
     const dur = 1.8 + ((i * 13) % 10) / 10;
@@ -100,65 +102,76 @@ function confetti() {
   return `<div class="cel-confetti" aria-hidden="true">${pieces.join('')}</div>`;
 }
 
+// Logros nuevos: medallas en amarillo bola (el emoji es el "arte" del logro).
 function achievementsHtml(list) {
   if (!list.length) return '';
   return `
     <section class="cel-section">
-      <h3 class="cel-label">${list.length > 1 ? 'Logros desbloqueados' : 'Logro desbloqueado'}</h3>
-      <ul class="cel-list">
+      <h3 class="label cel-label">${list.length > 1 ? `${list.length} logros desbloqueados` : 'Logro desbloqueado'}</h3>
+      <ul class="cel-medals">
         ${list.map((a, i) => `
-          <li class="cel-item cel-achievement cel-pop" style="--i:${i}">
-            <span class="cel-item-icon" aria-hidden="true">${escapeHtml(a.icon)}</span>
-            <span class="cel-item-body">
-              <strong>${escapeHtml(a.label)}</strong>
-              <span class="muted">${escapeHtml(a.description)}</span>
-            </span>
+          <li class="cel-medal cel-pop" style="--i:${i}">
+            <span class="cel-medal-icon" aria-hidden="true">${escapeHtml(a.icon)}</span>
+            <strong class="cel-medal-name">${escapeHtml(a.label)}</strong>
+            <span class="cel-medal-text">${escapeHtml(a.description)}</span>
           </li>`).join('')}
       </ul>
     </section>`;
 }
 
-function challengesHtml(list, offset) {
-  if (!list.length) return '';
+function challengeRow(c, i) {
   return `
-    <section class="cel-section">
-      <h3 class="cel-label">Retos</h3>
-      <ul class="cel-list">
-        ${list.map((c, i) => `
-          <li class="cel-item cel-challenge cel-pop${c.completedNow ? ' cel-done' : ''}" style="--i:${offset + i}">
-            <span class="cel-item-icon" aria-hidden="true">${escapeHtml(c.icon)}</span>
-            <span class="cel-item-body">
-              <strong>${c.completedNow ? '¡Reto completado!' : escapeHtml(c.title)}</strong>
-              ${c.completedNow ? `<span class="muted">${escapeHtml(c.title)}</span>` : ''}
-              <span class="cel-progress-text">
-                ${escapeHtml(numFmt.format(c.before.value))} → <strong>${escapeHtml(numFmt.format(c.value))}</strong> / ${escapeHtml(numFmt.format(c.target))}
-              </span>
-              <span class="cel-bar" aria-hidden="true">
-                <span style="--from:${pct(c.before.value, c.target)}%;--to:${pct(c.value, c.target)}%"></span>
-              </span>
-            </span>
-          </li>`).join('')}
-      </ul>
-    </section>`;
+    <li class="cel-row cel-challenge cel-pop${c.completedNow ? ' cel-done' : ''}" style="--i:${i}">
+      <span class="cel-row-icon" aria-hidden="true">${escapeHtml(c.icon)}</span>
+      <span class="cel-row-body">
+        <span class="cel-row-title">
+          <strong>${escapeHtml(c.title)}</strong>
+          ${c.completedNow ? `<span class="result win cel-done-tag">${icon('check', { size: 14 })}Completado</span>` : ''}
+        </span>
+        <span class="cel-progress-text">
+          ${escapeHtml(numFmt.format(c.before.value))} → <strong>${escapeHtml(numFmt.format(c.value))}</strong> de ${escapeHtml(numFmt.format(c.target))}
+        </span>
+        <span class="progress cel-bar" aria-hidden="true">
+          <span style="--from:${pct(c.before.value, c.target)}%;--to:${pct(c.value, c.target)}%"></span>
+        </span>
+      </span>
+    </li>`;
 }
 
-function streakHtml(streak, delta, index) {
+function streakRow(streak, delta, index) {
   if (!streak?.weeks) return '';
   const weeks = streak.weeks;
-  const label = weeks === 1 ? '🔥 1 semana en racha' : `🔥 ${weeks} semanas seguidas`;
+  const label = weeks === 1 ? '1 semana en racha' : `${weeks} semanas seguidas`;
   let text;
   if (!streak.activeThisWeek) text = 'Publica algo esta semana para que no se corte.';
   else if (delta && weeks === 1) text = '¡Racha iniciada! Haz algo cada semana para alargarla.';
   else if (delta) text = 'Una actividad por semana y la racha sigue creciendo.';
   else text = 'Esta semana ya cuenta para tu racha.';
   return `
-    <section class="cel-section">
-      <div class="cel-item cel-streak${delta ? ' cel-pop' : ''}" style="--i:${index}">
-        <span class="cel-item-body">
-          <strong>${escapeHtml(label)}${delta ? ` <span class="cel-plus">+${delta}</span>` : ''}</strong>
-          <span class="muted">${escapeHtml(text)}</span>
+    <li class="cel-row cel-streak${delta ? ' cel-pop' : ''}" style="--i:${index}">
+      <span class="cel-row-icon cel-flame">${icon('flame', { size: 24 })}</span>
+      <span class="cel-row-body">
+        <span class="cel-row-title">
+          <strong>${escapeHtml(label)}</strong>
+          ${delta ? `<span class="cel-plus">+${delta}<span class="sr-only"> ${delta === 1 ? 'semana' : 'semanas'}</span></span>` : ''}
         </span>
-      </div>
+        <span class="cel-row-text">${escapeHtml(text)}</span>
+      </span>
+    </li>`;
+}
+
+// Retos que han avanzado y la racha: filas al estilo Strava con barra de progreso.
+function progressHtml(diff) {
+  const offset = diff.unlocked.length;
+  const rows = [
+    ...diff.progressed.map((c, i) => challengeRow(c, offset + i)),
+    streakRow(diff.streak, diff.streakDelta, offset + diff.progressed.length),
+  ].join('');
+  if (!rows.trim()) return '';
+  return `
+    <section class="cel-section">
+      <h3 class="label cel-label">Tu progreso</h3>
+      <ul class="card cel-rows">${rows}</ul>
     </section>`;
 }
 
@@ -168,25 +181,39 @@ function celebrationHtml(ctx, { activity, before, after }) {
   const diff = diffSnapshots(before, after);
   const nothingNew = !diff.unlocked.length && !diff.progressed.length && !diff.streakGrew;
   const demo = ctx?.backend?.mode === 'demo';
-  const photo = activity?.photoUrl
+  const art = activity?.photoUrl
     ? `<img class="cel-photo" src="${escapeHtml(activity.photoUrl)}" alt="Foto de tu actividad" />`
-    : `<span class="cel-icon" aria-hidden="true">${head.icon}</span>`;
+    : `<span class="cel-icon">${icon(head.icon, { size: 36 })}</span>`;
 
   return `
     ${confetti()}
     <div class="cel-box" role="dialog" aria-modal="true" aria-labelledby="cel-title" aria-describedby="cel-sub">
       <header class="cel-head">
-        ${photo}
-        <h2 id="cel-title" class="cel-title">${escapeHtml(head.title)}</h2>
-        <p id="cel-sub" class="cel-sub">${escapeHtml(sub)}</p>
-        ${head.text ? `<p class="cel-sub">${escapeHtml(head.text)}</p>` : ''}
+        <svg class="cel-court" viewBox="0 0 200 100" aria-hidden="true" focusable="false">
+          <rect x="6" y="6" width="188" height="88" rx="2"/>
+          <path d="M37 6v88M163 6v88M37 50h126"/>
+          <path class="cel-court-net" d="M100 2v96"/>
+        </svg>
+        <div class="cel-head-inner">
+          ${art}
+          <p class="cel-kicker">${icon('check', { size: 16 })}Publicado en tu muro</p>
+          <h2 id="cel-title" class="cel-title">${escapeHtml(head.title)}</h2>
+          <p id="cel-sub" class="cel-sub">${escapeHtml(sub)}</p>
+          ${head.text ? `<p class="cel-note">${escapeHtml(head.text)}</p>` : ''}
+        </div>
       </header>
-      ${achievementsHtml(diff.unlocked)}
-      ${challengesHtml(diff.progressed, diff.unlocked.length)}
-      ${streakHtml(diff.streak, diff.streakDelta, diff.unlocked.length + diff.progressed.length)}
-      ${nothingNew ? '<p class="cel-cheer">Ya está en tu muro y en tu perfil. ¡Cada actividad cuenta!</p>' : ''}
-      <p class="cel-hint">👏 Tus amigos ya pueden darte ¡Vamos!${demo ? ' <span class="muted">(En la demo reaccionan jugadores de ejemplo.)</span>' : ''}</p>
-      <button type="button" class="btn primary big cel-close" data-cel-close>¡Seguir!</button>
+      <div class="cel-body">
+        ${achievementsHtml(diff.unlocked)}
+        ${progressHtml(diff)}
+        ${nothingNew ? '<p class="cel-cheer">Ya está en tu muro y en tu perfil. ¡Cada actividad cuenta!</p>' : ''}
+        <p class="cel-hint">
+          <span class="cel-hint-icon">${icon('racket', { size: 20 })}</span>
+          <span>Tus amigos ya pueden darte ¡Vamos!${demo ? ' <span class="muted">En la demo reaccionan jugadores de ejemplo.</span>' : ''}</span>
+        </p>
+      </div>
+      <footer class="cel-foot">
+        <button type="button" class="btn primary big cel-close" data-cel-close>¡Seguir!</button>
+      </footer>
     </div>`;
 }
 

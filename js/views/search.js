@@ -1,5 +1,6 @@
 import { POSITIONS } from '../activities.js';
 import { demoTag, followButton, globalActions } from '../components.js';
+import { icon } from '../icons.js';
 import { avatar, escapeHtml, premiumBadge } from '../ui.js';
 
 // Buscar jugadores por nombre y seguirles. Al escribir solo se repinta la lista de resultados
@@ -30,12 +31,12 @@ function personRow(p, cache) {
   const id = escapeHtml(p.id);
   const sub = subLine(cache.profiles?.get(p.id) ?? p);
   return `
-    <li class="search-row">
-      <a class="search-person" href="#perfil" data-route="perfil" data-param-id="${id}">
+    <li class="soc-row">
+      <a class="soc-person" href="#perfil" data-route="perfil" data-param-id="${id}">
         ${avatar(p)}
-        <span class="search-who">
-          <span class="search-name"><span class="search-name-text">${escapeHtml(p.name)}</span>${premiumBadge(p)}${demoTag(p)}</span>
-          <span class="search-sub muted" data-sub-for="${id}"${sub ? '' : ' hidden'}>${escapeHtml(sub)}</span>
+        <span class="soc-who">
+          <span class="soc-name"><span class="soc-name-text" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>${premiumBadge(p)}${demoTag(p)}</span>
+          <span class="soc-sub" data-sub-for="${id}"${sub ? '' : ' hidden'}>${escapeHtml(sub)}</span>
         </span>
       </a>
       ${followButton(p, isFollowing(p, cache))}
@@ -43,19 +44,19 @@ function personRow(p, cache) {
 }
 
 function resultsHtml(query, results, cache) {
-  if (!query) return '<p class="search-hint muted">Escribe el nombre de un jugador para encontrarlo y seguirle.</p>';
+  if (!query) return '<p class="search-hint">Escribe el nombre de un jugador para encontrarlo y seguirle.</p>';
   if (!results.length) {
     return `
       <div class="search-none">
-        <span aria-hidden="true">🤷</span>
-        <p>No hay jugadores con «${escapeHtml(query)}».</p>
-        <p class="muted">Prueba con otro nombre o con solo una parte.</p>
+        <span class="search-none-icon" aria-hidden="true">${icon('search', { size: 26 })}</span>
+        <p class="search-none-title">No hay jugadores con «${escapeHtml(query)}»</p>
+        <p class="search-none-text">Prueba con otro nombre o con solo una parte.</p>
       </div>`;
   }
   const n = results.length;
   return `
-    <p class="search-count muted">${n === 1 ? '1 jugador' : `${n} jugadores`}</p>
-    <ul class="search-list">${results.map((p) => personRow(p, cache)).join('')}</ul>`;
+    <h2 class="label search-count">${n === 1 ? '1 jugador' : `${n} jugadores`}</h2>
+    <ul class="card soc-list">${results.map((p) => personRow(p, cache)).join('')}</ul>`;
 }
 
 // La búsqueda devuelve perfiles mínimos: se completan (club, posición) en segundo plano.
@@ -107,7 +108,7 @@ async function runSearch(rawQuery, ctx) {
     if (my !== token || !mounted) return;
     const current = resultsBox();
     if (current) {
-      current.innerHTML = `<p class="search-hint muted">${escapeHtml(error.message || 'No se ha podido buscar. Inténtalo de nuevo.')}</p>`;
+      current.innerHTML = `<p class="search-hint">${escapeHtml(error.message || 'No se ha podido buscar. Inténtalo de nuevo.')}</p>`;
       current.removeAttribute('aria-busy');
     }
     return;
@@ -145,23 +146,26 @@ export default {
 
     return `
       <section class="search-view">
-        <h1 class="search-heading">Buscar jugadores</h1>
         <form class="search-form" data-submit="search" role="search" autocomplete="off">
-          <label class="search-field">
-            <span class="search-icon" aria-hidden="true">🔍</span>
-            <input class="input search-input" type="search" name="q" value="${escapeHtml(cache.query ?? '')}"
-              placeholder="Nombre del jugador" aria-label="Buscar jugadores por nombre" maxlength="${MAX_QUERY}"
+          <label class="sr-only" for="search-q">Buscar jugadores por nombre</label>
+          <div class="search-field">
+            <span class="search-icon" aria-hidden="true">${icon('search', { size: 20 })}</span>
+            <input class="input search-input" id="search-q" type="search" name="q" value="${escapeHtml(cache.query ?? '')}"
+              placeholder="Nombre del jugador" maxlength="${MAX_QUERY}"
               enterkeyhint="search" autocapitalize="words" spellcheck="false" data-input="query" />
-          </label>
+          </div>
         </form>
 
         <div class="search-results" id="search-results" aria-live="polite">${resultsHtml(query, results, cache)}</div>
 
-        <section class="card search-suggest" aria-labelledby="search-suggest-title">
-          <h2 id="search-suggest-title" class="search-suggest-title">Sugerencias</h2>
+        <section class="search-suggest" aria-labelledby="search-suggest-title">
+          <h2 id="search-suggest-title" class="label search-suggest-title">Sugerencias</h2>
           ${suggested.length
-            ? `<ul class="search-list">${suggested.map((p) => personRow(p, cache)).join('')}</ul>`
-            : '<p class="muted">Ya sigues a todos los jugadores que te sugeriríamos. ¡Busca a tus amigos por su nombre!</p>'}
+            ? `<ul class="card soc-list">${suggested.map((p) => personRow(p, cache)).join('')}</ul>`
+            : `<div class="card search-suggest-empty">
+                <span class="search-none-icon" aria-hidden="true">${icon('users', { size: 24 })}</span>
+                <p>Ya sigues a todos los jugadores que te sugeriríamos. ¡Busca a tus amigos por su nombre!</p>
+              </div>`}
         </section>
       </section>`;
   },

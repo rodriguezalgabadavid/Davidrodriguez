@@ -1,5 +1,7 @@
 import { POSITIONS } from '../activities.js';
+import { demoTag } from '../components.js';
 import { LEVELS } from '../data.js';
+import { icon } from '../icons.js';
 import { avatar, escapeHtml, premiumBadge, toast } from '../ui.js';
 
 // Bienvenida (sin barra inferior):
@@ -32,18 +34,44 @@ const plural = (n, one, many) => (n === 1 ? one : many);
 
 // ---------- Acceso (live) ----------
 
+// Cabecera: la pista (nuestro "mapa") con el icono de la app, la propuesta de valor en una línea y tres
+// razones para entrar. Es la única pantalla con h1 propio: aquí la barra superior no lleva título.
+const PROPS = [
+  ['camera', 'Comparte tus partidos', 'con foto y resultado'],
+  ['trophy', 'Completa retos', 'y desbloquea logros'],
+  ['dumbbell', 'Entrena tu físico', 'con planes para pádel'],
+];
+
+function courtArt() {
+  return `
+    <div class="onb-court" aria-hidden="true">
+      <svg class="onb-court-lines" viewBox="0 0 200 100" focusable="false">
+        <rect x="6" y="6" width="188" height="88" rx="2"/>
+        <path d="M37 6v88M163 6v88M37 50h126"/>
+        <path class="onb-court-net" d="M100 2v96"/>
+      </svg>
+      <span class="onb-ball"></span>
+      <img class="onb-logo" src="icons/icon.svg" alt="" width="72" height="72" />
+    </div>`;
+}
+
 function heroHtml() {
   return `
-    <div class="onb-hero">
-      <span class="onb-hero-icon" aria-hidden="true">🎾</span>
-      <h1>La red social del pádel</h1>
-      <p>Comparte tus partidos, completa retos con tus amigos y entrena tu físico.</p>
-      <ul class="onb-props">
-        <li><span aria-hidden="true">📸</span><span><strong>Comparte tus partidos</strong> con foto y resultado</span></li>
-        <li><span aria-hidden="true">🏆</span><span><strong>Completa retos</strong> y desbloquea logros</span></li>
-        <li><span aria-hidden="true">💪</span><span><strong>Entrena tu físico</strong> con planes para pádel</span></li>
-      </ul>
-    </div>`;
+    <header class="card onb-hero">
+      ${courtArt()}
+      <div class="onb-hero-body">
+        <p class="onb-kicker">Bienvenido a PadelFit</p>
+        <h1 class="onb-title">La red social del pádel</h1>
+        <p class="onb-lead">Tus partidos, tus retos y tu físico, con tus amigos de pista.</p>
+        <ul class="onb-props">
+          ${PROPS.map(([name, title, text]) => `
+            <li>
+              <span class="onb-prop-icon">${icon(name, { size: 22 })}</span>
+              <span class="onb-prop-text"><strong>${title}</strong> <span>${text}</span></span>
+            </li>`).join('')}
+        </ul>
+      </div>
+    </header>`;
 }
 
 // Además del enlace, el correo trae un código de 6 cifras: es la forma de entrar en la app instalada en
@@ -51,9 +79,9 @@ function heroHtml() {
 function sentHtml(email) {
   return `
     <div class="card onb-card onb-sent" role="status">
-      <span class="onb-sent-icon" aria-hidden="true">📬</span>
+      <span class="onb-sent-icon">${icon('check', { size: 28 })}</span>
       <h2>Te hemos enviado un enlace a tu correo</h2>
-      <p class="muted">Ábrelo desde <strong>${escapeHtml(email)}</strong> en este dispositivo para entrar. Si no lo ves, mira en spam.</p>
+      <p class="muted">Ábrelo desde <strong class="onb-email">${escapeHtml(email)}</strong> en este dispositivo para entrar. Si no lo ves, mira en spam.</p>
       <form class="onb-code" data-submit="verify-code" novalidate>
         <label class="field-label" for="onb-code">¿Usas la app instalada? Escribe el código del correo</label>
         <div class="onb-code-row">
@@ -72,7 +100,10 @@ function signInHtml() {
     ? sentHtml(sentTo)
     : `
       <form class="card onb-card" data-submit="sign-in" novalidate>
-        <h2>Entra o crea tu cuenta</h2>
+        <div class="onb-card-head">
+          <h2>Entra o crea tu cuenta</h2>
+          <p class="muted">Gratis. Solo necesitas tu email.</p>
+        </div>
         <div class="field">
           <label class="field-label" for="onb-email">Tu email</label>
           <input class="input" id="onb-email" name="email" type="email" inputmode="email" autocomplete="email"
@@ -101,17 +132,18 @@ function segmented(name, options, selected, label) {
     </fieldset>`;
 }
 
+// Indicador de paso: dos barras (la actual y las anteriores en azul) y el texto "Paso 1 de 2".
 function stepsHtml(step) {
   return `
     <p class="onb-steps">
-      <span class="onb-dots" aria-hidden="true"><i class="on"></i><i class="${step === 2 ? 'on' : ''}"></i></span>
+      <span class="onb-bars" aria-hidden="true"><i class="on"></i><i class="${step === 2 ? 'on' : ''}"></i></span>
       <span>Paso ${step} de 2</span>
     </p>`;
 }
 
 function demoNote(demo) {
   return demo
-    ? '<p class="onb-demo-note">🧪 Modo demo: tus datos se guardan solo en este dispositivo y la comunidad es de ejemplo.</p>'
+    ? `<p class="onb-demo-note">${icon('info', { size: 18 })}<span>Modo demo: tus datos se guardan solo en este dispositivo y la comunidad es de ejemplo.</span></p>`
     : '';
 }
 
@@ -120,22 +152,23 @@ function profileStepHtml() {
   const positions = [...Object.entries(POSITIONS), ['', 'Los dos']];
   return `
     <form class="onb-step" data-step="1" data-submit="next" novalidate ${draft.step === 1 ? '' : 'hidden'}>
-      ${stepsHtml(1)}
-      <header class="onb-head">
-        <h1 tabindex="-1">Tu perfil</h1>
-        <p class="onb-intro">La red social del pádel: comparte partidos, completa retos y entrena tu físico.</p>
-      </header>
+      ${heroHtml()}
       <div class="card onb-card">
+        ${stepsHtml(1)}
+        <div class="onb-card-head">
+          <h2 tabindex="-1">Crea tu perfil</h2>
+          <p class="muted">Así te encontrarán tus compañeros de pista.</p>
+        </div>
         <div class="field">
           <label class="field-label" for="onb-name">¿Cómo te llamas?</label>
           <input class="input" id="onb-name" name="name" maxlength="${NAME_MAX}" autocomplete="name" autocapitalize="words"
             required placeholder="Nombre y apellido" value="${escapeHtml(draft.name)}" aria-describedby="onb-name-hint" />
-          <p class="hint" id="onb-name-hint">Así te encontrarán tus compañeros.</p>
+          <p class="hint" id="onb-name-hint">Tu nombre aparece en tus partidos y comentarios.</p>
         </div>
         ${segmented('level', levels, draft.level, 'Tu nivel')}
-        ${segmented('position', positions, draft.position, 'Juegas de… <span class="muted">(opcional)</span>')}
+        ${segmented('position', positions, draft.position, 'Juegas de… <span class="onb-optional">(opcional)</span>')}
         <div class="field">
-          <label class="field-label" for="onb-club">Tu club <span class="muted">(opcional)</span></label>
+          <label class="field-label" for="onb-club">Tu club <span class="onb-optional">(opcional)</span></label>
           <input class="input" id="onb-club" name="club" maxlength="${CLUB_MAX}" autocomplete="off"
             placeholder="Dónde sueles jugar" value="${escapeHtml(draft.club)}" />
         </div>
@@ -157,11 +190,17 @@ function playerMeta(p) {
   return parts.join(' · ');
 }
 
+// Botón conmutable: "Seguir" (borde azul) ↔ "Siguiendo" (gris, con marca) y aria-pressed. La única acción
+// principal de la pantalla es "Empezar".
+// El nombre del jugador va oculto a la vista para que el lector de pantalla diga a quién sigues.
+const pickLabel = (on, name) =>
+  `${on ? icon('check', { size: 18 }) : ''}<span>${on ? 'Siguiendo' : 'Seguir'}<span class="sr-only"> a ${escapeHtml(name)}</span></span>`;
+
 function pickButton(p) {
   const on = picked.has(p.id);
   return `
-    <button type="button" class="btn onb-pick${on ? '' : ' primary'}" data-action="pick" data-id="${escapeHtml(p.id)}"
-      aria-pressed="${on ? 'true' : 'false'}" aria-label="${escapeHtml(`Seguir a ${p.name}`)}">${on ? 'Siguiendo' : 'Seguir'}</button>`;
+    <button type="button" class="btn onb-pick" data-action="pick" data-id="${escapeHtml(p.id)}"
+      data-name="${escapeHtml(p.name)}" aria-pressed="${on ? 'true' : 'false'}">${pickLabel(on, p.name)}</button>`;
 }
 
 function playerRow(p) {
@@ -170,7 +209,10 @@ function playerRow(p) {
     <li class="onb-player">
       ${avatar(p)}
       <span class="onb-player-info">
-        <span class="onb-player-name">${escapeHtml(p.name)}${premiumBadge(p)}${p.demo ? '<span class="onb-demo-tag">ejemplo</span>' : ''}</span>
+        <span class="onb-player-line">
+          <span class="onb-player-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
+          ${premiumBadge(p) || demoTag(p) ? `<span class="onb-player-tags">${premiumBadge(p)}${demoTag(p)}</span>` : ''}
+        </span>
         ${meta ? `<span class="onb-player-meta">${escapeHtml(meta)}</span>` : ''}
       </span>
       ${pickButton(p)}
@@ -188,26 +230,26 @@ function followStepHtml(players, demo) {
   const allPicked = players.length > 0 && players.every((p) => picked.has(p.id));
   const list = players.length
     ? `
-      <div class="onb-row">
-        ${demo ? '<span class="onb-demo-label">Jugadores de ejemplo</span>' : '<span class="label">Sugeridos</span>'}
+      <div class="onb-list-head">
+        <h3 class="label">${demo ? 'Jugadores de ejemplo' : 'Sugeridos para ti'}</h3>
         <button type="button" class="link onb-link" data-action="pick-all">${allPicked ? 'Quitar todos' : 'Seguir a todos'}</button>
       </div>
       <ul class="onb-players">${players.map(playerRow).join('')}</ul>`
-    : '<p class="muted onb-empty">Aún no hay jugadores para sugerirte. Podrás buscarlos con 🔍 cuando entres.</p>';
+    : `<p class="muted onb-empty">${icon('search', { size: 20 })}<span>Aún no hay jugadores para sugerirte. Podrás buscarlos desde la lupa de arriba cuando entres.</span></p>`;
   return `
     <div class="onb-step" data-step="2" ${draft.step === 2 ? '' : 'hidden'}>
-      ${stepsHtml(2)}
-      <header class="onb-head">
-        <h1 tabindex="-1">Sigue a otros jugadores</h1>
-        <p class="onb-intro">Verás sus partidos en tu muro y podréis daros ¡Vamos!</p>
-      </header>
       <div class="card onb-card">
+        ${stepsHtml(2)}
+        <div class="onb-card-head">
+          <h2 tabindex="-1">Sigue a otros jugadores</h2>
+          <p class="muted">Verás sus partidos en tu muro y podréis daros ¡Vamos!</p>
+        </div>
         ${list}
       </div>
       <p class="onb-picked" aria-live="polite">${pickedText(players.length)}</p>
       <p class="form-error" role="alert" hidden></p>
       <button type="button" class="btn primary big onb-start" data-action="finish">Empezar</button>
-      <button type="button" class="link onb-link onb-back" data-action="back-step">Atrás</button>
+      <button type="button" class="btn ghost onb-back" data-action="back-step">${icon('back', { size: 20 })}<span>Atrás</span></button>
     </div>`;
 }
 
@@ -243,7 +285,7 @@ function goToStep(root, step) {
     el.hidden = Number(el.dataset.step) !== step;
   });
   window.scrollTo(0, 0);
-  root.querySelector(`.onb-step[data-step="${step}"] h1`)?.focus();
+  root.querySelector(`.onb-step[data-step="${step}"] h2[tabindex]`)?.focus();
 }
 
 // Lo que hay en el formulario del paso 1 (position: la opción marcada, o null si no hay ninguna).
@@ -268,8 +310,7 @@ function updatePicks(root, total) {
   root.querySelectorAll('.onb-pick').forEach((btn) => {
     const on = picked.has(btn.dataset.id);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    btn.classList.toggle('primary', !on);
-    btn.textContent = on ? 'Siguiendo' : 'Seguir';
+    btn.innerHTML = pickLabel(on, btn.dataset.name ?? '');
   });
   const all = total > 0 && picked.size === total;
   const allBtn = root.querySelector('[data-action="pick-all"]');
@@ -306,7 +347,7 @@ export default {
       return `
         <section class="onb">
           <div class="card onb-card onb-sent">
-            <span class="onb-sent-icon" aria-hidden="true">🎾</span>
+            <span class="onb-sent-icon">${icon('ball', { size: 28 })}</span>
             <h2>¡Ya estás dentro!</h2>
             <button type="button" class="btn primary big" data-route="inicio">Ir al inicio</button>
           </div>
@@ -457,7 +498,7 @@ export default {
       busy = false;
       resetDraft();
 
-      if (failed) toast(`No se ha podido seguir a ${failed} ${plural(failed, 'jugador', 'jugadores')}. Búscalos con 🔍.`);
+      if (failed) toast(`No se ha podido seguir a ${failed} ${plural(failed, 'jugador', 'jugadores')}. Búscalos desde la lupa de arriba.`);
       else toast(`¡Ya estás dentro, ${profile.name}! Publica tu primer partido con ＋`);
 
       // Si la app ya pasó al inicio antes de terminar de seguir, se repinta para que salgan sus partidos.

@@ -1,11 +1,13 @@
 import { demoTag } from '../components.js';
+import { icon } from '../icons.js';
 import { avatar, emptyState, escapeHtml, formatWhen, timeAgo } from '../ui.js';
 
 // Notificaciones: "¡Vamos!", comentarios y nuevos seguidores, de la más reciente a la más antigua.
 // Al abrir la pantalla se marcan como leídas; las que eran nuevas siguen destacadas mientras
 // sigas aquí (aunque la lista se repinte al llegar otra).
 
-const KIND_ICON = { kudos: '🙌', comment: '💬', follow: '👋' };
+// Insignia redonda sobre el avatar: la pala es el "¡Vamos!".
+const KIND_ICON = { kudos: 'racket', comment: 'comment', follow: 'user' };
 const NOUN = { partido: 'tu partido', clase: 'tu clase', entreno: 'tu entreno' };
 const PREVIEW_MAX = 80; // el backend guarda los primeros 80 caracteres del comentario
 
@@ -15,7 +17,7 @@ let needsMarkRead = false;
 function sentence(n, activity) {
   const name = `<strong>${escapeHtml(n.actor?.name || 'Alguien')}</strong>`;
   const noun = NOUN[activity?.type] ?? 'tu actividad';
-  if (n.kind === 'kudos') return `A ${name} le ha gustado ${noun}`;
+  if (n.kind === 'kudos') return `${name} ha dado ¡Vamos! a ${noun}`;
   if (n.kind === 'follow') return `${name} ha empezado a seguirte`;
   if (n.kind === 'comment') {
     const preview = String(n.preview ?? '').trim();
@@ -38,13 +40,13 @@ function item(n, activity, now, isNew) {
     : '';
   return `
     <li>
-      <${tag} class="notif-item${isNew ? ' notif-new' : ''}" ${target}>
+      <${tag} class="notif-item${isNew ? ' is-new' : ''}" ${target}>
         <span class="notif-avatar">
           ${avatar(actor)}
-          <span class="notif-kind notif-kind-${kind}" aria-hidden="true">${KIND_ICON[kind]}</span>
+          <span class="notif-kind notif-kind-${kind}" aria-hidden="true">${icon(KIND_ICON[kind], { size: 13 })}</span>
         </span>
         <span class="notif-body">
-          <span class="notif-text">${sentence(n, activity)}</span>
+          <span class="notif-text">${isNew ? '<span class="sr-only">Nueva: </span>' : ''}${sentence(n, activity)}</span>
           <span class="notif-meta">
             <time datetime="${escapeHtml(n.createdAt)}" title="${escapeHtml(formatWhen(n.createdAt, now))}">${escapeHtml(timeAgo(n.createdAt, now))}</time>
             ${demoTag(actor)}
@@ -58,9 +60,10 @@ function item(n, activity, now, isNew) {
 
 function group(title, list, byId, now, isNew) {
   if (!list.length) return '';
+  const id = isNew ? 'notif-new-title' : 'notif-old-title';
   return `
-    <section class="notif-group" aria-label="${escapeHtml(title)}">
-      <h2 class="notif-group-title">${escapeHtml(title)}${isNew ? ` <span class="notif-group-count">${list.length}</span>` : ''}</h2>
+    <section class="notif-group" aria-labelledby="${id}">
+      <h2 class="label notif-group-title" id="${id}">${escapeHtml(title)}${isNew ? ` <span class="notif-group-count">${list.length}</span>` : ''}</h2>
       <ul class="notif-list">
         ${list.map((n) => item(n, byId.get(n.activityId), now, isNew)).join('')}
       </ul>
@@ -89,9 +92,8 @@ export default {
     if (!sorted.length) {
       return `
         <section class="notif-view">
-          <h1 class="notif-heading">Notificaciones</h1>
           ${emptyState({
-            icon: '🔔',
+            icon: icon('bell', { size: 30 }),
             title: 'Todavía no hay nada por aquí',
             text: 'Cuando alguien te dé ¡Vamos!, comente tus actividades o empiece a seguirte, lo verás aquí.',
             action: '<button class="btn primary" data-route="buscar">Buscar jugadores</button>',
@@ -101,8 +103,7 @@ export default {
 
     return `
       <section class="notif-view">
-        <h1 class="notif-heading">Notificaciones</h1>
-        ${fresh.length ? '' : '<p class="notif-uptodate muted">Estás al día ✨</p>'}
+        ${fresh.length ? '' : `<p class="notif-uptodate">${icon('check', { size: 18 })}<span>Estás al día</span></p>`}
         ${group('Nuevas', fresh, byId, ctx.now, true)}
         ${group('Anteriores', older, byId, ctx.now, false)}
       </section>`;

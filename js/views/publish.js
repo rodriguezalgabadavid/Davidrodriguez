@@ -1,5 +1,6 @@
 import { ACTIVITY_TYPES, MATCH_KINDS, knownNames, matchOutcome, parseSets } from '../activities.js';
 import { FOCUSES } from '../data.js';
+import { icon, TYPE_ICONS } from '../icons.js';
 import { resizeImage } from '../photos.js';
 import { escapeHtml, toLocalInput } from '../ui.js';
 import { showCelebration, snapshot, snapshotFrom } from './celebrate.js';
@@ -8,15 +9,15 @@ import { showCelebration, snapshot, snapshotFrom } from './celebrate.js';
 // Lo demás va en "Más detalles".
 
 const TYPES = [
-  { id: 'partido', icon: '🎾', label: 'Partido' },
-  { id: 'entreno', icon: '💪', label: 'Entreno' },
-  { id: 'clase', icon: '🎯', label: 'Clase' },
+  { id: 'partido', icon: TYPE_ICONS.partido, label: 'Partido' },
+  { id: 'entreno', icon: TYPE_ICONS.entreno, label: 'Entreno' },
+  { id: 'clase', icon: TYPE_ICONS.clase, label: 'Clase' },
 ];
 
 const RESULTS = [
-  { value: 'true', icon: '🏆', label: 'Victoria', tone: 'win' },
-  { value: 'false', icon: '😤', label: 'Derrota', tone: 'loss' },
-  { value: 'none', icon: '🤝', label: 'Sin resultado', tone: 'draw' },
+  { value: 'true', icon: 'trophy', label: 'Victoria' },
+  { value: 'false', icon: 'close', label: 'Derrota' },
+  { value: 'none', icon: 'ball', label: 'Sin resultado' },
 ];
 
 const RPE_LABELS = {
@@ -57,11 +58,25 @@ function endOfDay(date) {
 
 // ---------- Render ----------
 
-function radioTiles({ name, cls, items, selected, change = '' }) {
-  return items.map((it) => `
-    <label class="${cls}${it.tone ? ` ${cls}-${it.tone}` : ''}">
-      <input type="radio" name="${name}" value="${escapeHtml(it.value ?? it.id)}" ${selected === (it.value ?? it.id) ? 'checked' : ''} ${change ? `data-change="${change}"` : ''} />
-      <span><span class="${cls}-icon" aria-hidden="true">${it.icon}</span>${escapeHtml(it.label)}</span>
+// Tipo de actividad: control segmentado con icono (como el selector de deporte de Strava).
+function typeOptions(selected) {
+  return TYPES.map((t) => `
+    <label>
+      <input type="radio" name="type" value="${t.id}" ${selected === t.id ? 'checked' : ''} data-change="type" />
+      <span>${icon(t.icon, { size: 20 })}${escapeHtml(t.label)}</span>
+    </label>`).join('');
+}
+
+// ¿Cómo ha ido?: tres opciones grandes. Lo marcado lleva borde, fondo suave y una marca de verificación.
+function resultTiles() {
+  return RESULTS.map((r) => `
+    <label class="post-result">
+      <input type="radio" name="won" value="${r.value}" />
+      <span class="post-result-tile">
+        <span class="post-result-icon">${icon(r.icon, { size: 22 })}</span>
+        <span class="post-result-label">${escapeHtml(r.label)}</span>
+        <span class="post-result-check">${icon('check', { size: 14 })}</span>
+      </span>
     </label>`).join('');
 }
 
@@ -78,20 +93,25 @@ function setsGrid() {
     <input class="input score-input" name="s${i}${side}" type="number" inputmode="numeric" min="0" max="${MAX_GAMES}"
       data-input="score" aria-label="Set ${i + 1}, ${label}" />`).join('');
   return `
-    <div class="sets-input">
+    <div class="post-sets-grid">
       <span></span><span class="label">Set 1</span><span class="label">Set 2</span><span class="label">Set 3</span>
-      <span class="label">Nosotros</span>${cells('a', 'nuestros juegos')}
-      <span class="label">Rivales</span>${cells('b', 'juegos rivales')}
+      <span class="post-sets-team">Nosotros</span>${cells('a', 'nuestros juegos')}
+      <span class="post-sets-team">Rivales</span>${cells('b', 'juegos rivales')}
     </div>`;
 }
 
+const SETS_TOGGLE = {
+  closed: `${icon('plus', { size: 20 })}<span>Añadir resultado</span>`,
+  open: `${icon('close', { size: 20 })}<span>Quitar resultado</span>`,
+};
+
 function photoDrop() {
   return `
-    <input class="post-sr-only post-photo-input" id="post-photo-input" type="file" accept="image/*" data-change="photo" />
+    <input class="sr-only post-photo-input" id="post-photo-input" type="file" accept="image/*" data-change="photo" />
     <label class="post-photo-drop" id="post-photo-drop" for="post-photo-input">
-      <span class="post-photo-icon" aria-hidden="true">📷</span>
+      <span class="post-photo-icon">${icon('camera', { size: 26 })}</span>
       <strong class="post-photo-label">Añadir foto</strong>
-      <span class="muted">La pista, tu pareja, el marcador…</span>
+      <span class="post-photo-hint">La pista, tu pareja, el marcador…</span>
     </label>
     <div class="post-photo-preview" id="post-photo-preview" hidden></div>`;
 }
@@ -100,8 +120,18 @@ function streakLine(before) {
   const streak = before?.streak;
   if (!streak?.weeks || streak.activeThisWeek) return '';
   const weeks = streak.weeks === 1 ? '1 semana' : `${streak.weeks} semanas`;
-  return `<p class="post-streak">🔥 Publica esta semana y mantienes tu racha de ${weeks}.</p>`;
+  return `
+    <p class="post-streak">
+      <span class="post-streak-icon">${icon('flame', { size: 20 })}</span>
+      <span>Publica esta semana y mantienes tu racha de <strong>${weeks}</strong>.</span>
+    </p>`;
 }
+
+// Etiqueta de un campo de "Más detalles" con su icono (decorativo).
+const detailLabel = (forId, iconName, text) =>
+  `<label class="field-label post-label" for="${forId}">${icon(iconName, { size: 18 })}<span>${text}</span></label>`;
+const detailLegend = (iconName, text) =>
+  `<legend class="field-label post-label">${icon(iconName, { size: 18 })}<span>${text}</span></legend>`;
 
 function datalist(id, values) {
   return `<datalist id="${id}">${values.map((v) => `<option value="${escapeHtml(v)}"></option>`).join('')}</datalist>`;
@@ -246,11 +276,11 @@ function updateVerdict(form) {
     verdict.textContent = score.incomplete ? 'Completa el set para ver el resultado.' : score.error;
     verdict.classList.add('post-verdict-pending');
   } else {
+    // Resultado con texto (no solo color) y sets ganados en cifras.
     const sets = `${score.setsFor}-${score.setsAgainst} en sets`;
-    if (score.won === true) verdict.textContent = `🏆 Victoria · ${sets}`;
-    else if (score.won === false) verdict.textContent = `Derrota · ${sets}`;
-    else verdict.textContent = `Empate a sets (${score.setsFor}-${score.setsAgainst})`;
-    verdict.classList.add(score.won === true ? 'post-verdict-win' : score.won === false ? 'post-verdict-loss' : 'post-verdict-draw');
+    const [tone, word] = score.won === true ? ['win', 'Victoria'] : score.won === false ? ['loss', 'Derrota'] : ['draw', 'Empate'];
+    verdict.innerHTML = `<span class="result ${tone}">${word}</span><span class="post-verdict-sets">${sets}</span>`;
+    verdict.classList.add(`post-verdict-${tone}`);
   }
 }
 
@@ -265,8 +295,8 @@ function renderPhoto(form) {
   }
   preview.innerHTML = `
     <img src="${escapeHtml(photo.url)}" alt="Vista previa de tu foto" />
-    <button type="button" class="post-photo-remove" data-action="remove-photo" aria-label="Quitar foto">✕</button>
-    <label class="post-photo-change" for="post-photo-input">Cambiar foto</label>`;
+    <label class="post-photo-change" for="post-photo-input">${icon('image', { size: 18 })}<span>Cambiar foto</span></label>
+    <button type="button" class="post-photo-remove" data-action="remove-photo" aria-label="Quitar foto">${icon('trash', { size: 20 })}</button>`;
   preview.hidden = false;
   drop.hidden = true;
 }
@@ -300,92 +330,106 @@ export default {
 
     return `
       <form class="post" data-submit="publish" novalidate>
-        <header class="post-head">
-          <h1>¿Qué has hecho hoy?</h1>
-          ${streakLine(ctx.cache.before)}
-        </header>
+        ${streakLine(ctx.cache.before)}
 
-        <fieldset class="post-types">
-          <legend class="post-sr-only">Tipo de actividad</legend>
-          ${radioTiles({ name: 'type', cls: 'post-type', items: TYPES, selected: type, change: 'type' })}
-        </fieldset>
-
-        <div class="card post-card" data-only="partido" ${type === 'partido' ? '' : 'hidden'}>
-          <fieldset class="post-results" id="post-results">
-            <legend class="post-q">¿Cómo fue?</legend>
-            <div class="post-results-grid">
-              ${radioTiles({ name: 'won', cls: 'post-result', items: RESULTS, selected: null })}
-            </div>
+        <section class="card post-card">
+          <fieldset class="post-group">
+            <legend class="post-legend"><h2 class="post-h">¿Qué has hecho?</h2></legend>
+            <div class="segmented post-types">${typeOptions(type)}</div>
           </fieldset>
-          <button type="button" class="link post-add-sets" data-action="toggle-sets" aria-expanded="false" aria-controls="post-sets">＋ Añadir resultado</button>
-          <div class="post-sets" id="post-sets" hidden>
-            ${setsGrid()}
-            <p class="hint">Deja vacío el set que no se jugó. Un súper tie-break se apunta como set (p. ej. 10-8).</p>
-            <p class="post-verdict" id="post-verdict" aria-live="polite"></p>
+        </section>
+
+        <section class="card post-card post-match" data-only="partido" ${type === 'partido' ? '' : 'hidden'}>
+          <fieldset class="post-group post-results" id="post-results">
+            <legend class="post-legend">
+              <h2 class="post-h">¿Cómo ha ido?</h2>
+              <span class="post-locked-note">${icon('lock', { size: 16 })}Según el marcador</span>
+            </legend>
+            <div class="post-results-grid">${resultTiles()}</div>
+          </fieldset>
+          <div class="post-score">
+            <button type="button" class="btn ghost post-add-sets" data-action="toggle-sets" aria-expanded="false" aria-controls="post-sets">${SETS_TOGGLE.closed}</button>
+            <div class="post-sets" id="post-sets" hidden>
+              ${setsGrid()}
+              <p class="hint">Deja vacío el set que no se jugó. Un súper tie-break se apunta como set (p. ej. 10-8).</p>
+              <p class="post-verdict" id="post-verdict" aria-live="polite"></p>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div class="post-photo">${photoDrop()}</div>
-
-        <div class="field post-text">
-          <label class="field-label" for="post-text">¿Qué tal ha ido?</label>
-          <textarea class="input" id="post-text" name="text" rows="3" maxlength="2000" placeholder="Cuéntalo en una frase (opcional)"></textarea>
-        </div>
+        <section class="card post-card" aria-labelledby="post-share-title">
+          <h2 class="post-h" id="post-share-title">Cuéntalo <span class="post-optional">opcional</span></h2>
+          <div class="post-photo">${photoDrop()}</div>
+          <div class="field post-text">
+            <label class="field-label" for="post-text">Descripción</label>
+            <textarea class="input" id="post-text" name="text" rows="3" maxlength="2000" placeholder="¿Qué tal ha ido? Una frase basta"></textarea>
+          </div>
+        </section>
 
         <details class="card post-details">
           <summary>
-            <span>Más detalles</span>
-            <span class="muted">Fecha, duración, esfuerzo, con quién…</span>
+            <span class="post-details-icon">${icon('sliders', { size: 20 })}</span>
+            <span class="post-details-text">
+              <strong>Más detalles</strong>
+              <span class="post-details-hint">Fecha, duración, esfuerzo, con quién…</span>
+            </span>
+            ${icon('chevron', { size: 20, className: 'post-details-chevron' })}
           </summary>
           <div class="post-details-body">
-            <div class="field-row">
-              <div class="field">
-                <label class="field-label" for="post-date">Fecha y hora</label>
+            <div class="post-row post-when">
+              <div class="field post-when-date">
+                ${detailLabel('post-date', 'calendar', 'Fecha y hora')}
                 <input class="input" id="post-date" name="date" type="datetime-local" value="${toLocalInput(now)}" max="${toLocalInput(endOfDay(now))}" />
               </div>
-              <div class="field">
-                <label class="field-label" for="post-minutes">Duración (min)</label>
-                <input class="input" id="post-minutes" name="minutes" type="number" inputmode="numeric" min="1" max="${MAX_MINUTES}" value="${minutes}" data-input="duration" />
+              <div class="field post-when-minutes">
+                ${detailLabel('post-minutes', 'clock', 'Duración<span class="sr-only"> en minutos</span>')}
+                <div class="post-unit">
+                  <input class="input" id="post-minutes" name="minutes" type="number" inputmode="numeric" min="1" max="${MAX_MINUTES}" value="${minutes}" data-input="duration" />
+                  <span class="post-unit-text" aria-hidden="true">min</span>
+                </div>
               </div>
             </div>
 
-            <div class="field">
-              <div class="row-between">
-                <label class="field-label" for="post-rpe">Esfuerzo: <span id="post-rpe-out" class="post-rpe-out">sin indicar</span></label>
-                <button type="button" class="link post-rpe-clear" data-action="clear-rpe" hidden>Quitar</button>
+            <div class="post-row field">
+              <div class="post-rpe-head">
+                <label class="field-label post-label" for="post-rpe">${icon('bolt', { size: 18 })}<span>Esfuerzo</span></label>
+                <span class="post-rpe-out" id="post-rpe-out">sin indicar</span>
               </div>
               <input id="post-rpe" name="rpe" type="range" min="1" max="10" value="6" data-input="rpe" data-set="0" aria-describedby="post-rpe-hint" />
-              <p class="hint" id="post-rpe-hint">Mueve la barra si quieres apuntarlo (1 = muy suave, 10 = máximo).</p>
+              <div class="post-rpe-foot">
+                <p class="hint" id="post-rpe-hint">Mueve la barra si quieres apuntarlo (1 = muy suave, 10 = máximo).</p>
+                <button type="button" class="link post-rpe-clear" data-action="clear-rpe" hidden>Quitar</button>
+              </div>
             </div>
 
             <div data-only="partido" ${type === 'partido' ? '' : 'hidden'}>
-              <div class="field">
-                <label class="field-label" for="post-partner">Compañero/a</label>
+              <div class="post-row field">
+                ${detailLabel('post-partner', 'user', 'Compañero/a')}
                 <input class="input" id="post-partner" name="partner" list="post-people" maxlength="40" autocomplete="off" placeholder="Nombre" />
               </div>
-              <div class="field-row">
+              <div class="post-row field-row">
                 <div class="field">
-                  <label class="field-label" for="post-rival1">Rival 1</label>
+                  ${detailLabel('post-rival1', 'users', 'Rival 1')}
                   <input class="input" id="post-rival1" name="rival1" list="post-people" maxlength="40" autocomplete="off" />
                 </div>
                 <div class="field">
-                  <label class="field-label" for="post-rival2">Rival 2</label>
+                  ${detailLabel('post-rival2', 'users', 'Rival 2')}
                   <input class="input" id="post-rival2" name="rival2" list="post-people" maxlength="40" autocomplete="off" />
                 </div>
               </div>
-              <fieldset class="field">
-                <legend class="field-label">Tipo de partido</legend>
+              <fieldset class="post-row field">
+                ${detailLegend('trophy', 'Tipo de partido')}
                 <div class="chips">${chipRadios('matchKind', MATCH_KINDS, null)}</div>
               </fieldset>
             </div>
 
-            <fieldset class="field" data-only="entreno" ${type === 'entreno' ? '' : 'hidden'}>
-              <legend class="field-label">Objetivo</legend>
+            <fieldset class="post-row field" data-only="entreno" ${type === 'entreno' ? '' : 'hidden'}>
+              ${detailLegend('target', 'Objetivo')}
               <div class="chips">${chipRadios('focus', focusOptions, focus)}</div>
             </fieldset>
 
-            <div class="field">
-              <label class="field-label" for="post-club">Club o pista</label>
+            <div class="post-row field">
+              ${detailLabel('post-club', 'pin', 'Club o pista')}
               <input class="input" id="post-club" name="club" list="post-clubs" maxlength="40" autocomplete="off" data-input="club"
                   value="${escapeHtml(clubFor(type, me?.club))}" data-default="${escapeHtml(me?.club ?? '')}" />
             </div>
@@ -394,8 +438,10 @@ export default {
           </div>
         </details>
 
-        <p class="form-error" id="post-error" role="alert" hidden></p>
-        <button class="btn primary big post-submit" type="submit">Publicar</button>
+        <div class="post-bar">
+          <p class="form-error" id="post-error" role="alert" hidden></p>
+          <button class="btn primary big post-submit" type="submit">Publicar</button>
+        </div>
       </form>`;
   },
 
@@ -427,7 +473,7 @@ export default {
       const open = box.hidden;
       box.hidden = !open;
       el.setAttribute('aria-expanded', String(open));
-      el.textContent = open ? '－ Quitar resultado' : '＋ Añadir resultado';
+      el.innerHTML = open ? SETS_TOGGLE.open : SETS_TOGGLE.closed;
       if (open) form.elements.s0a.focus();
       else box.querySelectorAll('input').forEach((input) => { input.value = ''; });
       updateVerdict(form);
